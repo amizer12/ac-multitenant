@@ -13,7 +13,7 @@ npm run build
 cd ..
 
 echo "☁️  Deploying CDK stack with frontend..."
-cdk deploy --require-approval never --app "python3 src/cdk_app_complete.py"
+cdk deploy --require-approval never --app "python3 src/cdk_app.py"
 
 echo "✅ Deployment complete!"
 echo ""

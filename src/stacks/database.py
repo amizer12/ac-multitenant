@@ -1,0 +1,69 @@
+"""Database construct for DynamoDB tables"""
+
+from constructs import Construct
+from aws_cdk import RemovalPolicy, aws_dynamodb as dynamodb
+
+
+class DatabaseConstruct(Construct):
+    """Construct for all DynamoDB tables used in the application."""
+    
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        
+        # Token usage table with streams enabled
+        self.usage_table = dynamodb.Table(
+            self,
+            "TokenUsageTable",
+            table_name="token-usage",
+            partition_key=dynamodb.Attribute(
+                name="id", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+            stream=dynamodb.StreamViewType.NEW_IMAGE,
+        )
+        
+        # Token aggregation table
+        self.aggregation_table = dynamodb.Table(
+            self,
+            "TokenAggregationTable",
+            table_name="token-aggregation",
+            partition_key=dynamodb.Attribute(
+                name="aggregation_key", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        
+        # Agent configurations table (runtime config)
+        self.agent_config_table = dynamodb.Table(
+            self,
+            "AgentConfigTable",
+            table_name="agent-configurations",
+            partition_key=dynamodb.Attribute(
+                name="tenantId", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="agentRuntimeId", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        
+        # Agent details table
+        self.agent_details_table = dynamodb.Table(
+            self,
+            "AgentDetailsTable",
+            table_name="agent-details-v2",
+            partition_key=dynamodb.Attribute(
+                name="tenantId", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="agentRuntimeId", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+        )

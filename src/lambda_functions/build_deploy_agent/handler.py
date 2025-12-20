@@ -32,6 +32,56 @@ ROLE_ARN = os.environ.get('ROLE_ARN', '')
 s3_client = boto3.client('s3', region_name=REGION)
 bedrock_client = boto3.client('bedrock-agentcore-control', region_name=REGION)
 bedrock_runtime_client = boto3.client('bedrock-agentcore', region_name=REGION)
+ce_client = boto3.client('ce')
+
+def check_and_activate_cost_allocation_tags():
+    """
+    Check if tenantId tag is activated for cost allocation and activate it if needed.
+    Also activates other project tags for better cost tracking.
+    """
+    tags_to_activate = ['tenantId', 'Project', 'Environment', 'CostCenter']
+    
+    try:
+        print("Checking cost allocation tag status...")
+        
+        response = ce_client.list_cost_allocation_tags(
+            Status='Active',
+            MaxResults=100
+        )
+        
+        active_tags = {tag['TagKey'] for tag in response.get('CostAllocationTags', [])}
+        print(f"Currently active cost allocation tags: {active_tags}")
+        
+        # Check which tags need to be activated
+        tags_to_enable = [tag for tag in tags_to_activate if tag not in active_tags]
+        
+        if tags_to_enable:
+            print(f"Activating cost allocation tags: {tags_to_enable}")
+            
+            # Activate each tag
+            for tag_key in tags_to_enable:
+                try:
+                    ce_client.update_cost_allocation_tags_status(
+                        CostAllocationTagsStatus=[
+                            {
+                                'TagKey': tag_key,
+                                'Status': 'Active'
+                            }
+                        ]
+                    )
+                    print(f"✓ Activated cost allocation tag: {tag_key}")
+                except Exception as e:
+                    print(f"⚠ Warning: Could not activate tag '{tag_key}': {str(e)}")
+            
+            print("✓ Cost allocation tags activated. They will appear in Cost Explorer within 24 hours.")
+        else:
+            print("✓ All required cost allocation tags are already active")
+            
+    except Exception as e:
+        # Don't fail the deployment if cost allocation tag activation fails
+        print(f"⚠ Warning: Could not check/activate cost allocation tags: {str(e)}")
+        print("  This is not critical - deployment will continue")
+        print("  You can manually activate tags in AWS Billing Console > Cost Allocation Tags")
 
 def fetch_from_github(repo, file_path, branch='main', token=None):
     """
@@ -607,6 +657,12 @@ def lambda_handler(event, context):
     package_file = 'deployment.zip'
     
     try:
+        # Check and activate cost allocation tags for billing
+        print("=" * 60)
+        print("Checking Cost Allocation Tags")
+        print("=" * 60)
+        check_and_activate_cost_allocation_tags()
+        
         # Extract tenantId, config, and template from event
         tenant_id = event.get('tenantId', 'default')
         config = event.get('config', {})
@@ -685,11 +741,6 @@ def lambda_handler(event, context):
         print(f"Agent ARN: {agent_runtime_arn}")
         print(f"Tagged with tenantId: {tenant_id}")
         
-        # Note: We need to rebuild with the actual agent_runtime_id for runtime config lookups
-        # For now, the agent will use 'pending' as the ID. In production, you might want to:
-        # 1. Rebuild the package with the actual ID, or
-        # 2. Pass the ID as an environment variable (not supported by agent runtime), or
-        # 3. Have the agent discover its own ID at startup
         print(f"Note: Agent built with placeholder runtime ID. Runtime config will use tenantId: {tenant_id}")
         
         # Step 5: Wait for agent to be ready

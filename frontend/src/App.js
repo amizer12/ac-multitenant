@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import axios from 'axios';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 // Configuration loaded from window.APP_CONFIG (injected at deployment time)
 const API_ENDPOINT = window.APP_CONFIG?.API_ENDPOINT || 'http://localhost:3000';
@@ -50,6 +51,9 @@ function App() {
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Deployment notification state
+  const [deploymentNotification, setDeploymentNotification] = useState(null);
 
   // Fetch token usage aggregations from API
   const fetchTokenUsage = async () => {
@@ -299,7 +303,18 @@ function App() {
       
       // Check if deployment started (202 status)
       if (response.status === 202 || data.status === 'deploying') {
-        setDeploymentStatus(`✓ Deployment started for tenant: ${tenantId}. Checking for completion...`);
+        // Close the modal
+        setIsModalOpen(false);
+        
+        // Show notification banner
+        setDeploymentNotification({
+          tenantId: tenantId,
+          status: 'deploying',
+          message: `Deploying agent for tenant: ${tenantId}. Please wait...`
+        });
+        
+        // Clear deployment status in modal
+        setDeploymentStatus('');
         
         // Store tenant info for later
         setDeployedAgent({
@@ -323,7 +338,12 @@ function App() {
               // Agent found!
               clearInterval(pollInterval);
               setDeployedAgent(agentResponse.data);
-              setDeploymentStatus(`✓ Agent deployed successfully for tenant: ${tenantId}!`);
+              
+              // Remove notification banner
+              setDeploymentNotification(null);
+              
+              // Refresh agents list
+              fetchAgents();
               fetchTokenUsage();
             }
           } catch (error) {
@@ -341,13 +361,32 @@ function App() {
           // Stop polling after max attempts
           if (pollCount >= maxPolls) {
             clearInterval(pollInterval);
-            setDeploymentStatus(`Deployment may still be in progress. Check the token usage table or refresh the page.`);
+            setDeploymentNotification({
+              tenantId: tenantId,
+              status: 'timeout',
+              message: `Deployment is taking longer than expected. Please check the Active Agents section.`
+            });
+            
+            // Remove notification after 10 seconds
+            setTimeout(() => {
+              setDeploymentNotification(null);
+            }, 10000);
           }
         }, 5000); // Poll every 5 seconds
       } else {
         // Immediate success (shouldn't happen with async)
         setDeployedAgent(data);
-        setDeploymentStatus('Agent deployed successfully!');
+        setIsModalOpen(false);
+        setDeploymentNotification({
+          tenantId: tenantId,
+          status: 'success',
+          message: `Agent deployed successfully for tenant: ${tenantId}!`
+        });
+        
+        // Remove notification after 5 seconds
+        setTimeout(() => {
+          setDeploymentNotification(null);
+        }, 5000);
       }
       
       fetchTokenUsage();
@@ -397,19 +436,30 @@ function App() {
       );
       
       const data = response.data;
-      let responseText = data.completion || JSON.stringify(data);
       
       // Parse the response to extract clean text
       const extractText = (obj) => {
         // If it's already a string, check if it needs parsing
         if (typeof obj === 'string') {
-          // Try to parse if it looks like JSON
+          // Try to parse if it looks like JSON or Python dict
           if (obj.trim().startsWith('{') || obj.trim().startsWith('[')) {
             try {
+              // Try parsing as JSON first
               obj = JSON.parse(obj);
             } catch (e) {
-              // Not valid JSON, return as-is
-              return obj;
+              // If JSON parse fails, try converting Python dict format to JSON
+              try {
+                // Replace single quotes with double quotes for JSON compatibility
+                const jsonStr = obj
+                  .replace(/'/g, '"')
+                  .replace(/True/g, 'true')
+                  .replace(/False/g, 'false')
+                  .replace(/None/g, 'null');
+                obj = JSON.parse(jsonStr);
+              } catch (e2) {
+                // Not valid JSON or Python dict, return as-is
+                return obj;
+              }
             }
           } else {
             return obj;
@@ -418,9 +468,14 @@ function App() {
         
         // Now handle object structures
         if (typeof obj === 'object' && obj !== null) {
-          // Check for result key
+          // Check for result key first (most common case)
           if (obj.result) {
             return extractText(obj.result);
+          }
+          
+          // If we have role and content, extract content
+          if (obj.role && obj.content) {
+            return extractText(obj.content);
           }
           
           // Check for content array
@@ -430,6 +485,18 @@ function App() {
                 if (typeof item === 'string') return item;
                 if (item.text) return item.text;
                 return '';
+              })
+              .filter(text => text.length > 0)
+              .join('\n\n');
+          }
+          
+          // Check if obj itself is an array
+          if (Array.isArray(obj)) {
+            return obj
+              .map(item => {
+                if (typeof item === 'string') return item;
+                if (item.text) return item.text;
+                return extractText(item);
               })
               .filter(text => text.length > 0)
               .join('\n\n');
@@ -445,9 +512,9 @@ function App() {
             return extractText(obj.message);
           }
           
-          // If we have role and content, extract content
-          if (obj.role && obj.content) {
-            return extractText(obj.content);
+          // Check for completion property
+          if (obj.completion) {
+            return extractText(obj.completion);
           }
         }
         
@@ -455,7 +522,7 @@ function App() {
         return typeof obj === 'string' ? obj : JSON.stringify(obj);
       };
       
-      responseText = extractText(responseText);
+      let responseText = extractText(data);
       
       // Clean up any remaining escape sequences
       responseText = responseText.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
@@ -475,18 +542,43 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>✨ Bedrock Agent Dashboard</h1>
-        <p>Deploy and manage your AI agents</p>
-      </header>
-
-      <div className="container">
-        {/* Deploy Agent Button */}
-        <div className="deploy-button-container">
-          <button onClick={openModal} className="btn-open-modal">
-            ➕ Deploy New Agent
-          </button>
+      {/* Main Content */}
+      <div className="main-content">
+        {/* Top Bar */}
+        <div className="top-bar">
+          <div className="top-bar-left">
+            <h1>✨ Bedrock Agent Dashboard</h1>
+            <p>Deploy and manage your AI agents</p>
+          </div>
         </div>
+
+        <div className="container">
+          {/* Deployment Notification Banner */}
+          {deploymentNotification && (
+            <div className={`notification-banner ${deploymentNotification.status}`}>
+              <div className="notification-content">
+                <span className="notification-icon">
+                  {deploymentNotification.status === 'deploying' && '🔄'}
+                  {deploymentNotification.status === 'success' && '✅'}
+                  {deploymentNotification.status === 'timeout' && '⏱️'}
+                </span>
+                <span className="notification-message">{deploymentNotification.message}</span>
+              </div>
+              <button 
+                className="notification-close" 
+                onClick={() => setDeploymentNotification(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Deploy Agent Button */}
+          <div className="action-bar">
+            <button onClick={openModal} className="btn-open-modal">
+              ➕ Deploy New Agent
+            </button>
+          </div>
 
         {/* Invoke Agent Section */}
         <div className="card">
@@ -705,12 +797,66 @@ function App() {
               </div>
             </div>
           )}
+          
+          {/* Cost Chart */}
+          {tokenUsage.length > 0 && (
+            <div className="cost-chart">
+              <h3>📊 Cost per Tenant</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={tokenUsage
+                    .filter(item => item.aggregation_key && item.aggregation_key.startsWith('tenant:'))
+                    .map(item => {
+                      const inputTokens = Number(item.input_tokens) || 0;
+                      const outputTokens = Number(item.output_tokens) || 0;
+                      const cost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
+                      return {
+                        tenant: item.tenant_id,
+                        cost: parseFloat(cost.toFixed(6)),
+                        requests: Number(item.request_count) || 0
+                      };
+                    })
+                    .sort((a, b) => b.cost - a.cost)}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="tenant" 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={80}
+                    style={{ fontSize: '12px' }}
+                  />
+                  <YAxis 
+                    label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft' }}
+                    style={{ fontSize: '12px' }}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => {
+                      if (name === 'cost') return [`$${value}`, 'Total Cost'];
+                      if (name === 'requests') return [value, 'Requests'];
+                      return [value, name];
+                    }}
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="cost" name="Total Cost" fill="#8b5cf6">
+                    {tokenUsage
+                      .filter(item => item.aggregation_key && item.aggregation_key.startsWith('tenant:'))
+                      .map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={`hsl(${250 + index * 30}, 70%, 60%)`} />
+                      ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
-      </div>
 
-      <footer>
-        <p>Powered by AWS Bedrock Agent Core</p>
-      </footer>
+        <footer>
+          <p>Powered by AWS Bedrock Agent Core</p>
+        </footer>
+      </div>
 
       {/* Deploy Agent Modal */}
       {isModalOpen && (
@@ -927,6 +1073,7 @@ function App() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

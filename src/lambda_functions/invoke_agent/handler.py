@@ -13,6 +13,56 @@ CORS_HEADERS = {
     'Access-Control-Allow-Methods': 'POST,OPTIONS'
 }
 
+def extract_text_from_response(obj):
+    """
+    Recursively extract text content from nested response structure.
+    Handles structures like: {'result': {'role': 'assistant', 'content': [{'text': '...'}]}}
+    """
+    if isinstance(obj, str):
+        return obj
+    
+    if isinstance(obj, dict):
+        # Check for result key
+        if 'result' in obj:
+            return extract_text_from_response(obj['result'])
+        
+        # Check for role and content (Anthropic format)
+        if 'role' in obj and 'content' in obj:
+            return extract_text_from_response(obj['content'])
+        
+        # Check for content array
+        if 'content' in obj and isinstance(obj['content'], list):
+            texts = []
+            for item in obj['content']:
+                if isinstance(item, dict) and 'text' in item:
+                    texts.append(item['text'])
+                elif isinstance(item, str):
+                    texts.append(item)
+            return '\n\n'.join(texts) if texts else str(obj)
+        
+        # Check for direct text field
+        if 'text' in obj:
+            return obj['text']
+        
+        # Check for message or completion
+        if 'message' in obj:
+            return extract_text_from_response(obj['message'])
+        if 'completion' in obj:
+            return extract_text_from_response(obj['completion'])
+    
+    if isinstance(obj, list):
+        texts = []
+        for item in obj:
+            if isinstance(item, dict) and 'text' in item:
+                texts.append(item['text'])
+            elif isinstance(item, str):
+                texts.append(item)
+            else:
+                texts.append(extract_text_from_response(item))
+        return '\n\n'.join(texts) if texts else str(obj)
+    
+    return str(obj)
+
 def lambda_handler(event, context):
     print(f"Received event: {json.dumps(event)}")
     
@@ -64,11 +114,8 @@ def lambda_handler(event, context):
         try:
             if isinstance(response_data, str) and response_data.strip():
                 parsed_response = json.loads(response_data)
-                # Extract the actual message/completion from the parsed response
-                if isinstance(parsed_response, dict):
-                    response_body = parsed_response.get('message', parsed_response.get('completion', str(parsed_response)))
-                else:
-                    response_body = str(parsed_response)
+                # Extract the actual text from the nested structure
+                response_body = extract_text_from_response(parsed_response)
             else:
                 response_body = response_data
         except json.JSONDecodeError:
