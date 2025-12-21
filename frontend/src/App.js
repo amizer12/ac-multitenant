@@ -648,7 +648,7 @@ function App() {
         <div className="card full-width">
           <h2>Active Agents</h2>
           <button onClick={fetchAgents} className="btn-refresh">
-            🔄 Refresh
+            Refresh
           </button>
           {agents.length === 0 ? (
             <p className="no-data">No active agents found.</p>
@@ -708,7 +708,7 @@ function App() {
         <div className="card full-width">
           <h2>Token Usage by Tenant</h2>
           <button onClick={fetchTokenUsage} className="btn-refresh">
-            🔄 Refresh
+            Refresh
           </button>
           {tokenUsage.length === 0 ? (
             <p className="no-data">No token usage data available yet.</p>
@@ -1001,7 +1001,7 @@ function App() {
                                   className={`tool-card ${isSelected ? 'selected' : ''}`}
                                   onClick={() => !deployLoading && toggleToolSelection(tool)}
                                 >
-                                  <div className="tool-icon">{tool.icon || '🔧'}</div>
+                                  <div className="tool-icon">🔧</div>
                                   <div className="tool-info">
                                     <div className="tool-name">{tool.name}</div>
                                     <div className="tool-description">{tool.description}</div>
@@ -1020,7 +1020,7 @@ function App() {
                             <div className="selected-tools-list">
                               {selectedTools.map(tool => (
                                 <span key={tool.id} className="selected-tool-badge">
-                                  {tool.icon || '🔧'} {tool.name}
+                                  🔧 {tool.name}
                                 </span>
                               ))}
                             </div>
