@@ -87,3 +87,6 @@ logs/
 
 # OS
 Thumbs.db
+
+.kiro/
+agent-tools-repo/
