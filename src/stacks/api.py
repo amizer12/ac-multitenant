@@ -20,6 +20,7 @@ class ApiConstruct(Construct):
         list_agents_lambda: lambda_.Function,
         delete_agent_lambda: lambda_.Function,
         update_config_lambda: lambda_.Function,
+        set_tenant_limit_lambda: lambda_.Function,
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -32,8 +33,8 @@ class ApiConstruct(Construct):
             description="API to deploy Bedrock agents with tenant isolation",
             deploy_options=apigateway.StageOptions(
                 stage_name="prod",
-                throttling_rate_limit=10,
-                throttling_burst_limit=20,
+                throttling_rate_limit=100,
+                throttling_burst_limit=200,
             ),
         )
         
@@ -47,8 +48,8 @@ class ApiConstruct(Construct):
         usage_plan = self.api.add_usage_plan(
             "AgentDeploymentUsagePlan",
             name="Agent Deployment Usage Plan",
-            throttle=apigateway.ThrottleSettings(rate_limit=10, burst_limit=20),
-            quota=apigateway.QuotaSettings(limit=1000, period=apigateway.Period.DAY),
+            throttle=apigateway.ThrottleSettings(rate_limit=100, burst_limit=200),
+            quota=apigateway.QuotaSettings(limit=10000, period=apigateway.Period.DAY),
         )
         usage_plan.add_api_key(self.api_key)
         usage_plan.add_api_stage(stage=self.api.deployment_stage)
@@ -60,6 +61,7 @@ class ApiConstruct(Construct):
         self._setup_agent_endpoint(get_agent_lambda, delete_agent_lambda)
         self._setup_agents_endpoint(list_agents_lambda)
         self._setup_config_endpoint(update_config_lambda)
+        self._setup_tenant_limit_endpoint(set_tenant_limit_lambda)
     
     def _setup_deploy_endpoint(self, lambda_fn: lambda_.Function) -> None:
         """Setup /deploy endpoint."""
@@ -112,3 +114,9 @@ class ApiConstruct(Construct):
         resource.add_method("GET", integration, api_key_required=False)
         resource.add_method("PUT", integration, api_key_required=False)
         add_cors_options(resource, ["GET", "PUT", "OPTIONS"])
+    
+    def _setup_tenant_limit_endpoint(self, lambda_fn: lambda_.Function) -> None:
+        """Setup /tenant-limit endpoint."""
+        resource = self.api.root.add_resource("tenant-limit")
+        resource.add_method("POST", apigateway.LambdaIntegration(lambda_fn, proxy=True), api_key_required=False)
+        add_cors_options(resource, ["POST", "OPTIONS"])

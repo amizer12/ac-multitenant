@@ -9,25 +9,29 @@
 /* Table styles */
 table {
   border-collapse: collapse;
+  font-family: inherit;
 }
 
 th, td {
   text-align: left;
+  font-family: inherit;
 }
 
-/* Code styling */
+/* Code styling - use monospace font */
 code {
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace);
 }
 
-/* Smooth transitions */
+/* Ensure charts use the same font */
+.recharts-wrapper,
+.recharts-text,
+.recharts-cartesian-axis-tick-value {
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif) !important;
+}
+
+/* Smooth transitions - exclude font properties */
 * {
-  transition-property: background-color, border-color, color;
+  transition-property: background-color, border-color, color, opacity, transform;
   transition-duration: 150ms;
   transition-timing-function: ease;
-}
-
-/* Chart container */
-.recharts-wrapper {
-  font-family: inherit;
 }

@@ -138,6 +138,7 @@ class LambdasConstruct(Construct):
             "lambda_functions/invoke_agent",
             timeout_seconds=60,
             memory_size=512,
+            environment={"AGGREGATION_TABLE_NAME": aggregation_table.table_name},
         )
         self.invoke_agent.add_to_role_policy(
             iam.PolicyStatement(
@@ -145,6 +146,7 @@ class LambdasConstruct(Construct):
                 resources=["*"],
             )
         )
+        aggregation_table.grant_read_data(self.invoke_agent)
         
         # Get agent details Lambda
         self.get_agent = self._create_lambda(
@@ -188,6 +190,15 @@ class LambdasConstruct(Construct):
             environment={"AGENT_CONFIG_TABLE_NAME": agent_config_table.table_name},
         )
         agent_config_table.grant_read_write_data(self.update_config)
+        
+        # Set tenant limit Lambda
+        self.set_tenant_limit = self._create_lambda(
+            "SetTenantLimitLambda",
+            "set-tenant-limit",
+            "lambda_functions/set_tenant_limit",
+            environment={"AGGREGATION_TABLE_NAME": aggregation_table.table_name},
+        )
+        aggregation_table.grant_read_write_data(self.set_tenant_limit)
     
     def _create_lambda(
         self,

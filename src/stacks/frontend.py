@@ -81,7 +81,7 @@ class FrontendConstruct(Construct):
             frontend_deployment = s3_deployment.BucketDeployment(
                 self,
                 "DeployFrontend",
-                sources=[s3_deployment.Source.asset(os.path.join(project_root, "frontend/build"))],
+                sources=[s3_deployment.Source.asset(os.path.join(project_root, "frontend/dist"))],
                 destination_bucket=self.bucket,
                 distribution=self.distribution,
                 distribution_paths=["/*"],

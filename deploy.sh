@@ -1,10 +1,13 @@
 #!/bin/bash
 
-echo "🚀 Building and deploying frontend..."
+set -e  # Exit on error
+
+echo "🚀 Building and deploying Bedrock Agent Stack..."
+echo ""
 
 # Build frontend
+echo "📦 Installing frontend dependencies..."
 cd frontend
-echo "📦 Installing dependencies..."
 npm install
 
 echo "🔨 Building React app..."
@@ -12,12 +15,23 @@ npm run build
 
 cd ..
 
-echo "☁️  Deploying CDK stack with frontend..."
+echo ""
+echo "☁️  Deploying CDK stack..."
+echo "   - Infrastructure (API Gateway, Lambda, DynamoDB, SQS)"
+echo "   - Frontend (S3 + CloudFront)"
+echo "   - Auto-generating config.js with API credentials"
+echo ""
+
 cdk deploy --require-approval never --app "python3 src/cdk_app.py"
 
+echo ""
 echo "✅ Deployment complete!"
 echo ""
-echo "📝 Next steps:"
-echo "1. Get your API key: aws apigateway get-api-key --api-key <API_KEY_ID> --include-value --region us-west-2"
-echo "2. Update frontend/src/App.js with your API endpoint and key"
-echo "3. Rebuild and redeploy if needed"
+echo "📋 Stack Outputs:"
+echo "   Check the outputs above for:"
+echo "   - Frontend URL (CloudFront)"
+echo "   - API Endpoint"
+echo "   - API Key ID"
+echo ""
+echo "💡 The config.js file has been automatically generated and deployed."
+echo "   Your frontend is ready to use at the CloudFront URL above."

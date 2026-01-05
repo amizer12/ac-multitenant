@@ -5,6 +5,80 @@ import traceback
 
 bedrock_runtime = boto3.client('bedrock-agentcore', region_name=os.environ['AWS_REGION'])
 
+# Lazy initialization for DynamoDB (only needed if AGGREGATION_TABLE_NAME is set)
+_dynamodb = None
+_aggregation_table = None
+
+
+def get_aggregation_table():
+    """Get DynamoDB aggregation table with lazy initialization."""
+    global _dynamodb, _aggregation_table
+    if _aggregation_table is None:
+        table_name = os.environ.get('AGGREGATION_TABLE_NAME')
+        if table_name:
+            _dynamodb = boto3.resource('dynamodb')
+            _aggregation_table = _dynamodb.Table(table_name)
+    return _aggregation_table
+
+
+def check_token_limit(tenant_id: str) -> tuple:
+    """
+    Check if tenant has exceeded their token limit.
+    
+    Returns:
+        tuple: (allowed: bool, usage_info: dict)
+        - allowed: True if request can proceed, False if limit exceeded
+        - usage_info: Contains current usage and limit for error message
+    """
+    table = get_aggregation_table()
+    if table is None:
+        # No aggregation table configured, allow request
+        return True, {}
+    
+    try:
+        aggregation_key = f"tenant:{tenant_id}"
+        response = table.get_item(Key={'aggregation_key': aggregation_key})
+        
+        item = response.get('Item')
+        if not item:
+            # No usage record for tenant, allow request
+            return True, {}
+        
+        token_limit = item.get('token_limit')
+        if token_limit is None:
+            # No limit set for tenant, allow request
+            return True, {'total_tokens': int(item.get('total_tokens', 0))}
+        
+        total_tokens = int(item.get('total_tokens', 0))
+        token_limit = int(token_limit)
+        
+        usage_info = {
+            'tenant_id': tenant_id,
+            'total_tokens': total_tokens,
+            'token_limit': token_limit
+        }
+        
+        if total_tokens >= token_limit:
+            # Limit exceeded
+            return False, usage_info
+        
+        return True, usage_info
+        
+    except Exception as e:
+        print(f"Error checking token limit for tenant {tenant_id}: {str(e)}")
+        # On error, allow request to proceed (fail open)
+        return True, {}
+
+
+def extract_tenant_from_agent_arn(agent_arn: str) -> str:
+    """
+    Extract tenant ID from agent ARN or return a default.
+    Agent ARN format varies, so we need to look up the tenant from agent details.
+    For now, we'll use a query parameter or body field.
+    """
+    # This is a placeholder - in production, you'd look up the tenant from agent details
+    return None
+
 # CORS headers for all responses
 CORS_HEADERS = {
     'Content-Type': 'application/json',
@@ -71,9 +145,11 @@ def lambda_handler(event, context):
         agent_id = body.get('agentId')
         input_text = body.get('inputText')
         session_id = body.get('sessionId', 'default-session')
+        tenant_id = body.get('tenantId')  # Optional: can be passed explicitly
         
         print(f"Agent ID: {agent_id}")
         print(f"Input text: {input_text}")
+        print(f"Tenant ID: {tenant_id}")
         
         if not agent_id or not input_text:
             return {
@@ -81,6 +157,23 @@ def lambda_handler(event, context):
                 'headers': CORS_HEADERS,
                 'body': json.dumps({'error': 'agentId and inputText are required'})
             }
+        
+        # Check token limit if tenant ID is provided
+        if tenant_id:
+            allowed, usage_info = check_token_limit(tenant_id)
+            if not allowed:
+                print(f"Token limit exceeded for tenant {tenant_id}: {usage_info}")
+                return {
+                    'statusCode': 429,
+                    'headers': CORS_HEADERS,
+                    'body': json.dumps({
+                        'error': 'Token limit exceeded',
+                        'message': f"Tenant {tenant_id} has reached their token limit of {usage_info.get('token_limit', 0):,} tokens. Current usage: {usage_info.get('total_tokens', 0):,} tokens.",
+                        'tenant_id': tenant_id,
+                        'token_limit': usage_info.get('token_limit'),
+                        'current_usage': usage_info.get('total_tokens')
+                    })
+                }
         
         # Invoke the agent
         print(f"Invoking agent: {agent_id}")

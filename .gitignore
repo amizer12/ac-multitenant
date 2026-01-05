@@ -41,8 +41,10 @@ venv.bak/
 
 # CDK
 cdk.out/
+src/cdk.out/
 .cdk.staging/
 cdk.context.json
+src/cdk_complete.json
 
 # Node / React
 node_modules/

@@ -17,6 +17,7 @@ import {
   Checkbox,
   Description
 } from '@heroui/react';
+import { validateTokenLimit, calculateUsagePercentage, getUsageColor } from './utils/validation.js';
 
 const API_ENDPOINT = window.APP_CONFIG?.API_ENDPOINT || 'http://localhost:3000';
 const API_KEY = window.APP_CONFIG?.API_KEY || '';
@@ -54,6 +55,9 @@ function App() {
   const [usageSortConfig, setUsageSortConfig] = useState({ key: null, direction: 'asc' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deploymentNotification, setDeploymentNotification] = useState(null);
+  const [tenantExists, setTenantExists] = useState(null); // null = not checked, true/false = checked
+  const [tokenLimit, setTokenLimit] = useState('');
+  const [tokenLimitError, setTokenLimitError] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -68,6 +72,35 @@ function App() {
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
+
+  // Check if tenant exists when tenant ID changes (debounced)
+  useEffect(() => {
+    if (!tenantId || tenantId.trim() === '') {
+      setTenantExists(null);
+      setTokenLimit('');
+      setTokenLimitError('');
+      return;
+    }
+    
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Check if tenant exists in token usage data
+        const existingTenant = tokenUsage.find(
+          item => item.tenant_id === tenantId && item.aggregation_key?.startsWith('tenant:')
+        );
+        setTenantExists(!!existingTenant);
+        if (existingTenant) {
+          setTokenLimit(''); // Clear token limit for existing tenants
+          setTokenLimitError('');
+        }
+      } catch (error) {
+        console.error('Error checking tenant:', error);
+        setTenantExists(null);
+      }
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [tenantId, tokenUsage]);
 
   const fetchTokenUsage = async () => {
     try {
@@ -88,9 +121,24 @@ function App() {
       });
       const data = Array.isArray(response.data) ? response.data : JSON.parse(response.data);
       setAgents(data || []);
-      if (data && data.length > 0 && !selectedAgentForInvoke) {
-        setSelectedAgentForInvoke(data[0]);
-      }
+      // Only set default selection if no agent is currently selected
+      // Use functional update to avoid stale closure issues
+      setSelectedAgentForInvoke(current => {
+        if (current === null && data && data.length > 0) {
+          return data[0];
+        }
+        // If current selection exists, verify it's still in the list
+        if (current && data) {
+          const stillExists = data.find(a => a.agentRuntimeId === current.agentRuntimeId);
+          if (stillExists) {
+            // Update with fresh data in case agent details changed
+            return stillExists;
+          }
+          // Agent was deleted, select first available or null
+          return data.length > 0 ? data[0] : null;
+        }
+        return current;
+      });
     } catch (error) {
       console.error('Error fetching agents:', error);
     }
@@ -144,11 +192,17 @@ function App() {
       await axios.delete(`${API_ENDPOINT}/agent?tenantId=${tenantId}&agentRuntimeId=${agentRuntimeId}`);
       alert(`Agent "${agentName}" deleted successfully`);
       fetchAgents();
-      if (selectedAgentForInvoke?.agentRuntimeId === agentRuntimeId) setSelectedAgentForInvoke(null);
-      if (deployedAgent?.agentRuntimeId === agentRuntimeId) {
-        setDeployedAgent(null);
-        setDeploymentStatus('');
-      }
+      // Use functional update to avoid stale closure
+      setSelectedAgentForInvoke(current => 
+        current?.agentRuntimeId === agentRuntimeId ? null : current
+      );
+      setDeployedAgent(current => {
+        if (current?.agentRuntimeId === agentRuntimeId) {
+          setDeploymentStatus('');
+          return null;
+        }
+        return current;
+      });
     } catch (error) {
       alert(`Error deleting agent: ${error.response?.data?.error || error.message}`);
     }
@@ -188,9 +242,61 @@ function App() {
     }));
   };
 
-  const getSortIndicator = (columnKey, sortConfig) => {
-    if (sortConfig.key !== columnKey) return ' ↕️';
-    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+  // Sort indicator icon component
+  const SortIcon = ({ columnKey, sortConfig }) => {
+    const isActive = sortConfig.key === columnKey;
+    const isAsc = sortConfig.direction === 'asc';
+    
+    if (!isActive) {
+      // Default unsorted state - show both arrows (chevron up and down)
+      return (
+        <svg
+          aria-hidden="true"
+          fill="none"
+          focusable="false"
+          height="1em"
+          role="presentation"
+          viewBox="0 0 24 24"
+          width="1em"
+          className="text-default-400 opacity-50"
+        >
+          <path
+            d="M12 6l4 4H8l4-4z"
+            fill="currentColor"
+          />
+          <path
+            d="M12 18l-4-4h8l-4 4z"
+            fill="currentColor"
+          />
+        </svg>
+      );
+    }
+    
+    // Active sorted state - show single arrow
+    return (
+      <svg
+        aria-hidden="true"
+        fill="none"
+        focusable="false"
+        height="1em"
+        role="presentation"
+        viewBox="0 0 24 24"
+        width="1em"
+        className="text-foreground"
+      >
+        {isAsc ? (
+          <path
+            d="M12 6l4 4H8l4-4z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            d="M12 18l-4-4h8l-4 4z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    );
   };
 
   useEffect(() => {
@@ -208,9 +314,35 @@ function App() {
       alert('Please enter a Tenant ID');
       return;
     }
+    
+    // Validate token limit for new tenants
+    if (tenantExists === false) {
+      const validation = validateTokenLimit(tokenLimit);
+      if (!validation.valid) {
+        setTokenLimitError(validation.error);
+        return;
+      }
+    }
+    
     setDeployLoading(true);
     setDeploymentStatus('Starting agent deployment...');
     try {
+      // If new tenant, set token limit first
+      if (tenantExists === false && tokenLimit) {
+        try {
+          await axios.post(
+            `${API_ENDPOINT}/tenant-limit`,
+            { tenantId, tokenLimit: parseInt(tokenLimit, 10) },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+        } catch (limitError) {
+          console.error('Error setting token limit:', limitError);
+          setDeploymentStatus(`Error setting token limit: ${limitError.response?.data?.error || limitError.message}`);
+          setDeployLoading(false);
+          return;
+        }
+      }
+      
       const payload = { config: agentConfig };
       if (useCustomTemplate && templateConfig.repo) {
         payload.template = {
@@ -286,7 +418,12 @@ function App() {
     try {
       const response = await axios.post(
         `${API_ENDPOINT}/invoke`,
-        { agentId: selectedAgentForInvoke.agentRuntimeArn, inputText: invokeMessage, sessionId: `session-${Date.now()}` },
+        { 
+          agentId: selectedAgentForInvoke.agentRuntimeArn, 
+          inputText: invokeMessage, 
+          sessionId: `session-${Date.now()}`,
+          tenantId: selectedAgentForInvoke.tenantId  // Pass tenant ID for limit checking
+        },
         { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
       );
       const extractText = (obj) => {
@@ -372,11 +509,24 @@ function App() {
             deploymentNotification.status === 'success' ? 'bg-success-soft' : 'bg-warning-soft'
           }`}>
             <div className="flex items-center gap-3">
-              <span className="text-xl">
-                {deploymentNotification.status === 'deploying' && '🔄'}
-                {deploymentNotification.status === 'success' && '✅'}
-                {deploymentNotification.status === 'timeout' && '⏱️'}
-              </span>
+              {deploymentNotification.status === 'deploying' && (
+                <svg className="w-5 h-5 animate-spin text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                </svg>
+              )}
+              {deploymentNotification.status === 'success' && (
+                <svg className="w-5 h-5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+              )}
+              {deploymentNotification.status === 'timeout' && (
+                <svg className="w-5 h-5 text-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              )}
               <span className="font-medium">{deploymentNotification.message}</span>
             </div>
             <Button variant="ghost" size="sm" isIconOnly onPress={() => setDeploymentNotification(null)}>×</Button>
@@ -397,8 +547,8 @@ function App() {
               className="w-full"
               placeholder="Select an agent"
               isDisabled={invokeLoading || agents.length === 0}
-              value={selectedAgentForInvoke?.agentRuntimeId || ''}
-              onChange={(key) => setSelectedAgentForInvoke(agents.find(a => a.agentRuntimeId === key))}
+              value={selectedAgentForInvoke?.agentRuntimeId ?? null}
+              onChange={(key) => setSelectedAgentForInvoke(agents.find(a => a.agentRuntimeId === key) || null)}
             >
               <Label>Select Agent</Label>
               <Select.Trigger>
@@ -466,38 +616,90 @@ function App() {
             {agents.length === 0 ? (
               <p className="text-center text-muted py-8">No active agents found.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleAgentsSort('tenantId')}>
-                        Tenant ID{getSortIndicator('tenantId', agentsSortConfig)}
+              <div className="relative overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-divider">
+                      <th 
+                        className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                        onClick={() => handleAgentsSort('tenantId')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Tenant ID</span>
+                          <SortIcon columnKey="tenantId" sortConfig={agentsSortConfig} />
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleAgentsSort('agentName')}>
-                        Agent Name{getSortIndicator('agentName', agentsSortConfig)}
+                      <th 
+                        className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                        onClick={() => handleAgentsSort('agentName')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Agent Name</span>
+                          <SortIcon columnKey="agentName" sortConfig={agentsSortConfig} />
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleAgentsSort('agentRuntimeId')}>
-                        Agent ID{getSortIndicator('agentRuntimeId', agentsSortConfig)}
+                      <th 
+                        className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                        onClick={() => handleAgentsSort('agentRuntimeId')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Agent ID</span>
+                          <SortIcon columnKey="agentRuntimeId" sortConfig={agentsSortConfig} />
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleAgentsSort('status')}>
-                        Status{getSortIndicator('status', agentsSortConfig)}
+                      <th 
+                        className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                        onClick={() => handleAgentsSort('status')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Status</span>
+                          <SortIcon columnKey="status" sortConfig={agentsSortConfig} />
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleAgentsSort('deployedAt')}>
-                        Deployed At{getSortIndicator('deployedAt', agentsSortConfig)}
+                      <th 
+                        className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                        onClick={() => handleAgentsSort('deployedAt')}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Deployed At</span>
+                          <SortIcon columnKey="deployedAt" sortConfig={agentsSortConfig} />
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left font-medium">Actions</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
-                    {sortData(agents, agentsSortConfig).map((agent) => (
-                      <tr key={agent.agentRuntimeId} className="hover:bg-surface-secondary">
-                        <td className="px-4 py-3 font-medium">{agent.tenantId}</td>
-                        <td className="px-4 py-3">{agent.agentName || 'N/A'}</td>
-                        <td className="px-4 py-3"><code className="text-xs bg-surface-tertiary px-2 py-1 rounded">{agent.agentRuntimeId || 'N/A'}</code></td>
-                        <td className="px-4 py-3"><Chip size="sm" color={getStatusColor(agent.status)}>{agent.status || 'unknown'}</Chip></td>
-                        <td className="px-4 py-3">{agent.deployedAt ? new Date(agent.deployedAt).toLocaleString() : 'N/A'}</td>
-                        <td className="px-4 py-3">
-                          <Button variant="danger" size="sm" onPress={() => deleteAgent(agent.tenantId, agent.agentRuntimeId, agent.agentName)}>🗑️ Delete</Button>
+                  <tbody className="divide-y divide-divider">
+                    {sortData(agents, agentsSortConfig).map((agent, index) => (
+                      <tr 
+                        key={agent.agentRuntimeId} 
+                        className={`group hover:bg-default-50 transition-colors ${index % 2 === 0 ? '' : 'bg-default-50/50'}`}
+                      >
+                        <td className="px-3 py-4 text-sm font-medium">{agent.tenantId}</td>
+                        <td className="px-3 py-4 text-sm">{agent.agentName || 'N/A'}</td>
+                        <td className="px-3 py-4 text-sm">
+                          <code className="text-xs bg-default-100 px-2 py-1 rounded font-mono">
+                            {agent.agentRuntimeId || 'N/A'}
+                          </code>
+                        </td>
+                        <td className="px-3 py-4 text-sm">
+                          <Chip size="sm" color={getStatusColor(agent.status)} variant="flat">
+                            {agent.status || 'unknown'}
+                          </Chip>
+                        </td>
+                        <td className="px-3 py-4 text-sm text-default-600">
+                          {agent.deployedAt ? new Date(agent.deployedAt).toLocaleString() : 'N/A'}
+                        </td>
+                        <td className="px-3 py-4 text-sm">
+                          <Button 
+                            color="danger" 
+                            size="sm" 
+                            variant="flat"
+                            onPress={() => deleteAgent(agent.tenantId, agent.agentRuntimeId, agent.agentName)}
+                          >
+                            🗑️ Delete
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -522,43 +724,101 @@ function App() {
               <p className="text-center text-muted py-8">No token usage data available yet.</p>
             ) : (
               <>
-                <div className="overflow-x-auto rounded-lg border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-surface-secondary">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleUsageSort('tenant_id')}>
-                          Tenant ID{getSortIndicator('tenant_id', usageSortConfig)}
+                <div className="relative overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="border-b border-divider">
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('tenant_id')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Tenant ID</span>
+                            <SortIcon columnKey="tenant_id" sortConfig={usageSortConfig} />
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleUsageSort('input_tokens')}>
-                          Input Tokens{getSortIndicator('input_tokens', usageSortConfig)}
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('input_tokens')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Input Tokens</span>
+                            <SortIcon columnKey="input_tokens" sortConfig={usageSortConfig} />
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleUsageSort('output_tokens')}>
-                          Output Tokens{getSortIndicator('output_tokens', usageSortConfig)}
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('output_tokens')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Output Tokens</span>
+                            <SortIcon columnKey="output_tokens" sortConfig={usageSortConfig} />
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleUsageSort('total_tokens')}>
-                          Total Tokens{getSortIndicator('total_tokens', usageSortConfig)}
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('total_tokens')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Total Tokens</span>
+                            <SortIcon columnKey="total_tokens" sortConfig={usageSortConfig} />
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleUsageSort('request_count')}>
-                          Requests{getSortIndicator('request_count', usageSortConfig)}
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('request_count')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Requests</span>
+                            <SortIcon columnKey="request_count" sortConfig={usageSortConfig} />
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-surface-tertiary" onClick={() => handleUsageSort('total_cost')}>
-                          Total Cost{getSortIndicator('total_cost', usageSortConfig)}
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('total_cost')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Total Cost</span>
+                            <SortIcon columnKey="total_cost" sortConfig={usageSortConfig} />
+                          </div>
+                        </th>
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Usage %</span>
+                          </div>
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
-                      {sortData(tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')), usageSortConfig).map((item) => {
+                    <tbody className="divide-y divide-divider">
+                      {sortData(tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')), usageSortConfig).map((item, index) => {
                         const inputTokens = Number(item.input_tokens) || 0;
                         const outputTokens = Number(item.output_tokens) || 0;
+                        const totalTokens = Number(item.total_tokens) || 0;
+                        const tokenLimitValue = item.token_limit ? Number(item.token_limit) : null;
+                        const usagePercentage = calculateUsagePercentage(totalTokens, tokenLimitValue);
                         const totalCost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
                         return (
-                          <tr key={item.aggregation_key} className="hover:bg-surface-secondary">
-                            <td className="px-4 py-3 font-medium">{item.tenant_id}</td>
-                            <td className="px-4 py-3">{inputTokens.toLocaleString()}</td>
-                            <td className="px-4 py-3">{outputTokens.toLocaleString()}</td>
-                            <td className="px-4 py-3 font-medium">{Number(item.total_tokens || 0).toLocaleString()}</td>
-                            <td className="px-4 py-3">{Number(item.request_count) || 0}</td>
-                            <td className="px-4 py-3 font-mono font-medium">${totalCost.toFixed(6)}</td>
+                          <tr 
+                            key={item.aggregation_key} 
+                            className={`group hover:bg-default-50 transition-colors ${index % 2 === 0 ? '' : 'bg-default-50/50'}`}
+                          >
+                            <td className="px-3 py-4 text-sm font-medium">{item.tenant_id}</td>
+                            <td className="px-3 py-4 text-sm text-default-600">{inputTokens.toLocaleString()}</td>
+                            <td className="px-3 py-4 text-sm text-default-600">{outputTokens.toLocaleString()}</td>
+                            <td className="px-3 py-4 text-sm font-medium">{totalTokens.toLocaleString()}</td>
+                            <td className="px-3 py-4 text-sm text-default-600">{Number(item.request_count) || 0}</td>
+                            <td className="px-3 py-4 text-sm font-mono font-semibold text-success">${totalCost.toFixed(6)}</td>
+                            <td className="px-3 py-4 text-sm">
+                              {usagePercentage !== null ? (
+                                <Chip size="sm" color={getUsageColor(usagePercentage)} variant="flat">
+                                  {usagePercentage.toFixed(1)}%
+                                </Chip>
+                              ) : (
+                                <span className="text-muted">No Limit</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -637,6 +897,44 @@ function App() {
                 <Label>Tenant ID</Label>
                 <Input placeholder="e.g., tenant-123" value={tenantId} disabled={deployLoading} />
               </TextField>
+
+              {/* Token Limit for New Tenants */}
+              {tenantExists === false && (
+                <div className="space-y-2">
+                  <TextField 
+                    className="w-full" 
+                    onChange={(val) => {
+                      setTokenLimit(val);
+                      if (val) {
+                        const validation = validateTokenLimit(val);
+                        setTokenLimitError(validation.error);
+                      } else {
+                        setTokenLimitError('');
+                      }
+                    }}
+                    isInvalid={!!tokenLimitError}
+                  >
+                    <Label>Token Limit (Required for New Tenant)</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="e.g., 100000" 
+                      value={tokenLimit} 
+                      disabled={deployLoading}
+                      min="1"
+                    />
+                    <Description>Maximum total tokens (input + output) allowed for this tenant</Description>
+                  </TextField>
+                  {tokenLimitError && (
+                    <p className="text-sm text-danger">{tokenLimitError}</p>
+                  )}
+                </div>
+              )}
+              
+              {tenantExists === true && (
+                <div className="p-3 rounded-lg bg-accent-soft text-sm">
+                  ℹ️ This tenant already exists. Token limit was set during initial creation.
+                </div>
+              )}
 
               <Button variant="secondary" onPress={() => setShowAdvancedConfig(!showAdvancedConfig)}>
                 {showAdvancedConfig ? '▼ Hide' : '▶ Show'} Advanced Configuration

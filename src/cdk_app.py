@@ -107,6 +107,7 @@ class BedrockAgentStack(Stack):
             list_agents_lambda=lambdas.list_agents,
             delete_agent_lambda=lambdas.delete_agent,
             update_config_lambda=lambdas.update_config,
+            set_tenant_limit_lambda=lambdas.set_tenant_limit,
         )
         
         # ============================================================
