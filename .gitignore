@@ -18,8 +18,11 @@ yarn-error.log*
 /frontend/.env.test.local
 /frontend/.env.production.local
 
-.kiro/*
-.vscode/*
-.github/*
+# IDE / Editor
+.vscode/
+.kiro/
+
+# Agent tools
 agent-tools-repo/
-agent-tools-repo/ac_tools
+
+
