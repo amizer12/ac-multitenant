@@ -1,0 +1,58 @@
+digraph "AWS Bedrock Agent Core Platform" {
+	graph [bgcolor=white fontcolor="#2D3436" fontname="Sans-Serif" fontsize=14 label="AWS Bedrock Agent Core Platform" nodesep=0.8 pad=0.5 rankdir=LR ranksep=1.0 splines=ortho]
+	node [fixedsize=true fontcolor="#2D3436" fontname="Sans-Serif" fontsize=11 height=1.4 imagescale=true labelloc=b shape=box style=rounded width=1.4]
+	edge [color="#7B8894" fontsize=9]
+	"6e2651a1ef1d46598d60aa2f481293a5" [label=Client height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/onprem/client/user.png" shape=none]
+	subgraph cluster_Frontend {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label=Frontend labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"71bee887926149e58a7a750855ce52d6" [label="CloudFront CDN" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/network/cloudfront.png" shape=none]
+		ab297383402d47c7b146db3489fcbc32 [label="Static Assets" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/storage/simple-storage-service-s3.png" shape=none]
+	}
+	subgraph "cluster_API Layer" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="API Layer" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"2cda6c68ddae4128a95bd98b0844366a" [label="REST API" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/network/api-gateway.png" shape=none]
+	}
+	subgraph "cluster_Agent Operations" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Agent Operations" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"5df92efc267d4b6da563d5584fddadc5" [label=deploy_agent height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/compute/lambda.png" shape=none]
+		"19ba6042ee004008b7b824050274809e" [label=invoke_agent height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/compute/lambda.png" shape=none]
+		"3b34e4a9992c46ba993f5a48b8a352e8" [label=list_agents height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/compute/lambda.png" shape=none]
+		"32fecb39c0ef407bb34b0807981fb0cb" [label=delete_agent height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/compute/lambda.png" shape=none]
+	}
+	subgraph "cluster_Token Tracking" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Token Tracking" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		ed471f1a551e421e8610a5eda49a806b [label="Token Events" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/integration/simple-queue-service-sqs.png" shape=none]
+		ccbccfa29e36420abdc76b27f95004f5 [label=token_usage height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/compute/lambda.png" shape=none]
+		c7583753bee847b0aff935af46f21f4c [label=stream_processor height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/compute/lambda.png" shape=none]
+	}
+	subgraph "cluster_Data Storage" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Data Storage" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"7592619fd9b1498db8ede8a6e81c63a4" [label="Agents Table" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/database/dynamodb.png" shape=none]
+		f9801f771e3f4c3587d1ccdf421c6f18 [label="Token Usage" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/database/dynamodb.png" shape=none]
+		"0f023b6388694b4982262a6ad13edb7f" [label="Agent Code" height=1.9 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/storage/simple-storage-service-s3.png" shape=none]
+	}
+	subgraph "cluster_AI Services" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="AI Services" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"463331abd339429dbb7363b0acbbbcd0" [label="Bedrock
+Agent Core" height=2.3 image="/opt/anaconda3/lib/python3.12/site-packages/resources/aws/ml/sagemaker.png" shape=none]
+	}
+	"6e2651a1ef1d46598d60aa2f481293a5" -> "71bee887926149e58a7a750855ce52d6" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"71bee887926149e58a7a750855ce52d6" -> ab297383402d47c7b146db3489fcbc32 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"6e2651a1ef1d46598d60aa2f481293a5" -> "2cda6c68ddae4128a95bd98b0844366a" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"2cda6c68ddae4128a95bd98b0844366a" -> "5df92efc267d4b6da563d5584fddadc5" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"2cda6c68ddae4128a95bd98b0844366a" -> "19ba6042ee004008b7b824050274809e" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"2cda6c68ddae4128a95bd98b0844366a" -> "3b34e4a9992c46ba993f5a48b8a352e8" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"2cda6c68ddae4128a95bd98b0844366a" -> "32fecb39c0ef407bb34b0807981fb0cb" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"2cda6c68ddae4128a95bd98b0844366a" -> ccbccfa29e36420abdc76b27f95004f5 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"5df92efc267d4b6da563d5584fddadc5" -> "7592619fd9b1498db8ede8a6e81c63a4" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"5df92efc267d4b6da563d5584fddadc5" -> "0f023b6388694b4982262a6ad13edb7f" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"5df92efc267d4b6da563d5584fddadc5" -> "463331abd339429dbb7363b0acbbbcd0" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"19ba6042ee004008b7b824050274809e" -> "463331abd339429dbb7363b0acbbbcd0" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"19ba6042ee004008b7b824050274809e" -> ed471f1a551e421e8610a5eda49a806b [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"3b34e4a9992c46ba993f5a48b8a352e8" -> "7592619fd9b1498db8ede8a6e81c63a4" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"32fecb39c0ef407bb34b0807981fb0cb" -> "7592619fd9b1498db8ede8a6e81c63a4" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"32fecb39c0ef407bb34b0807981fb0cb" -> "463331abd339429dbb7363b0acbbbcd0" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	ed471f1a551e421e8610a5eda49a806b -> c7583753bee847b0aff935af46f21f4c [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	c7583753bee847b0aff935af46f21f4c -> f9801f771e3f4c3587d1ccdf421c6f18 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	ccbccfa29e36420abdc76b27f95004f5 -> f9801f771e3f4c3587d1ccdf421c6f18 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+}
