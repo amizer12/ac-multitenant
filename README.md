@@ -8,22 +8,22 @@ A multi-tenant SaaS platform for deploying, managing, and invoking AI agents pow
 - **Modular Tool Composition**: Select from 6+ tools (web search, calculator, database query, email, web crawler, etc.)
 - **Multi-Tenant Isolation**: Each agent tagged with tenant ID for cost tracking
 - **Token Limits per Tenant**: Set and enforce token usage limits with automatic 429 responses when exceeded
-- **Real-Time Token Usage Tracking**: Monitor costs per tenant with aggregated metrics and usage percentages
+- **Real-Time Token Usage Tracking**: Monitor inference costs per tenant with aggregated metrics and usage percentages
+- **Infrastructure Cost Tracking**: Track AWS infrastructure costs per tenant using cost allocation tags via AWS Cost Explorer
+- **Total Cost Dashboard**: View combined inference + infrastructure costs per tenant with detailed breakdowns
 - **Agent Management**: List, invoke, update, and delete agents via REST API
 - **Interactive Dashboard**: React-based UI with dark mode, charts, auto-refresh, and real-time updates
 
-## Architecture
-
-![Architecture Diagram](docs/architecture.svg)
 
 ### Component Overview
 
 | Component | Service | Purpose |
 |-----------|---------|---------|
 | Frontend | CloudFront + S3 | React dashboard with HeroUI v3 |
-| API | API Gateway | REST API with 8 endpoints |
+| API | API Gateway | REST API with 9 endpoints |
 | Agent Ops | Lambda (5) | Deploy, invoke, list, get, delete agents |
 | Token Tracking | Lambda (3) + SQS | Real-time usage aggregation |
+| Cost Tracking | Lambda (1) + Cost Explorer | Infrastructure cost per tenant |
 | Storage | DynamoDB (4) | Agents, tokens, config, aggregates |
 | AI | Bedrock Agent Core | Claude Sonnet 4.5 model |
 
@@ -42,6 +42,11 @@ Frontend → API Gateway → invoke_agent → Check Limit → Bedrock → SQS �
 **Token Tracking Pipeline**:
 ```
 SQS → sqs_to_dynamodb → DynamoDB → Stream → Aggregation → Dashboard
+```
+
+**Infrastructure Cost Tracking**:
+```
+Frontend → API Gateway → infrastructure_costs → Cost Explorer (tenantId tag) → Dashboard
 ```
 
 ## Prerequisites
@@ -116,6 +121,7 @@ After deployment, you'll see outputs including:
 - `GET /agent` - Get agent details
 - `DELETE /agent` - Delete agent
 - `GET /usage` - Get token usage statistics
+- `GET /infrastructure-costs` - Get infrastructure costs per tenant
 - `PUT/GET /config` - Update/get agent configuration
 
 ## Development
@@ -140,11 +146,28 @@ The config.js will be automatically regenerated with the latest API credentials.
 
 ## Cost Tracking
 
-The platform automatically:
+The platform provides comprehensive cost tracking with two components:
+
+### Inference Costs
 - Tracks token usage per agent invocation
+- Calculates costs based on input/output token pricing
 - Aggregates costs by tenant ID
-- Activates AWS cost allocation tags
-- Displays usage in the dashboard with charts
+- Displays usage percentages against token limits
+
+### Infrastructure Costs
+- Queries AWS Cost Explorer for infrastructure costs
+- Filters by `tenantId` cost allocation tag
+- Retrieves current month costs per tenant
+- Only tracks costs for currently configured tenants
+
+### Dashboard Display
+- **Inference Cost**: Token-based costs from Bedrock usage
+- **Infra Cost**: AWS infrastructure costs (Lambda, DynamoDB, etc.)
+- **Total Cost**: Combined inference + infrastructure costs
+- **Cost Chart**: Visual breakdown with detailed tooltips
+- **Auto-refresh**: Updates every 10 seconds
+
+> **Note**: Infrastructure costs from AWS Cost Explorer may be delayed up to 24 hours for new resources.
 
 ## Cleanup
 

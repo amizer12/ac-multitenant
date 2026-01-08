@@ -21,6 +21,7 @@ class ApiConstruct(Construct):
         delete_agent_lambda: lambda_.Function,
         update_config_lambda: lambda_.Function,
         set_tenant_limit_lambda: lambda_.Function,
+        infrastructure_costs_lambda: lambda_.Function,
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -62,6 +63,7 @@ class ApiConstruct(Construct):
         self._setup_agents_endpoint(list_agents_lambda)
         self._setup_config_endpoint(update_config_lambda)
         self._setup_tenant_limit_endpoint(set_tenant_limit_lambda)
+        self._setup_infrastructure_costs_endpoint(infrastructure_costs_lambda)
     
     def _setup_deploy_endpoint(self, lambda_fn: lambda_.Function) -> None:
         """Setup /deploy endpoint."""
@@ -120,3 +122,9 @@ class ApiConstruct(Construct):
         resource = self.api.root.add_resource("tenant-limit")
         resource.add_method("POST", apigateway.LambdaIntegration(lambda_fn, proxy=True), api_key_required=False)
         add_cors_options(resource, ["POST", "OPTIONS"])
+    
+    def _setup_infrastructure_costs_endpoint(self, lambda_fn: lambda_.Function) -> None:
+        """Setup /infrastructure-costs endpoint."""
+        resource = self.api.root.add_resource("infrastructure-costs")
+        resource.add_method("GET", apigateway.LambdaIntegration(lambda_fn, proxy=True), api_key_required=False)
+        add_cors_options(resource, ["GET", "OPTIONS"])

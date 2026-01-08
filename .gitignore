@@ -4,6 +4,7 @@ src/cdk.out/
 .cdk.staging/
 cdk.context.json
 src/cdk_complete.json
+src/stacks/__pycache__
 
 # Node / React
 node_modules/
@@ -17,10 +18,21 @@ yarn-error.log*
 /frontend/.env.development.local
 /frontend/.env.test.local
 /frontend/.env.production.local
+/frontend/dist
 
 # IDE / Editor
 .vscode/
 .kiro/
+
+# Test caches
+.hypothesis/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Agent tools
 agent-tools-repo/

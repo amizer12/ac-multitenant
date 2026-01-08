@@ -199,6 +199,23 @@ class LambdasConstruct(Construct):
             environment={"AGGREGATION_TABLE_NAME": aggregation_table.table_name},
         )
         aggregation_table.grant_read_write_data(self.set_tenant_limit)
+        
+        # Infrastructure costs Lambda
+        self.infrastructure_costs = self._create_lambda(
+            "InfrastructureCostsLambda",
+            "get-infrastructure-costs",
+            "lambda_functions/infrastructure_costs",
+            timeout_seconds=30,
+            environment={"AGGREGATION_TABLE_NAME": aggregation_table.table_name},
+        )
+        aggregation_table.grant_read_data(self.infrastructure_costs)
+        # Grant Cost Explorer permissions
+        self.infrastructure_costs.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ce:GetCostAndUsage"],
+                resources=["*"],
+            )
+        )
     
     def _create_lambda(
         self,

@@ -58,6 +58,7 @@ function App() {
   const [tenantExists, setTenantExists] = useState(null); // null = not checked, true/false = checked
   const [tokenLimit, setTokenLimit] = useState('');
   const [tokenLimitError, setTokenLimitError] = useState('');
+  const [infrastructureCosts, setInfrastructureCosts] = useState([]); // Infrastructure costs per tenant
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -111,6 +112,20 @@ function App() {
       setTokenUsage(data || []);
     } catch (error) {
       console.error('Error fetching token usage:', error);
+    }
+  };
+
+  const fetchInfrastructureCosts = async () => {
+    try {
+      const response = await axios.get(`${API_ENDPOINT}/infrastructure-costs`, {
+        headers: { 'x-api-key': API_KEY }
+      });
+      const data = Array.isArray(response.data) ? response.data : JSON.parse(response.data);
+      setInfrastructureCosts(data || []);
+    } catch (error) {
+      console.error('Error fetching infrastructure costs:', error);
+      // Don't fail silently - set empty array so UI shows $0.000000
+      setInfrastructureCosts([]);
     }
   };
 
@@ -302,9 +317,11 @@ function App() {
   useEffect(() => {
     fetchTokenUsage();
     fetchAgents();
+    fetchInfrastructureCosts();
     const interval = setInterval(() => {
       fetchTokenUsage();
       fetchAgents();
+      fetchInfrastructureCosts();
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -778,8 +795,26 @@ function App() {
                           onClick={() => handleUsageSort('total_cost')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>Total Cost</span>
+                            <span>Inference Cost</span>
                             <SortIcon columnKey="total_cost" sortConfig={usageSortConfig} />
+                          </div>
+                        </th>
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('infrastructure_cost')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Infra Cost</span>
+                            <SortIcon columnKey="infrastructure_cost" sortConfig={usageSortConfig} />
+                          </div>
+                        </th>
+                        <th 
+                          className="group px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-default-100 transition-colors"
+                          onClick={() => handleUsageSort('combined_total_cost')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Total Cost</span>
+                            <SortIcon columnKey="combined_total_cost" sortConfig={usageSortConfig} />
                           </div>
                         </th>
                         <th 
@@ -792,13 +827,27 @@ function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-divider">
-                      {sortData(tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')), usageSortConfig).map((item, index) => {
+                      {sortData(tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')).map(item => {
+                        // Find infrastructure cost for this tenant
+                        const infraCostData = infrastructureCosts.find(ic => ic.tenant_id === item.tenant_id);
+                        const infrastructureCost = infraCostData ? Number(infraCostData.infrastructure_cost) || 0 : 0;
+                        const inputTokens = Number(item.input_tokens) || 0;
+                        const outputTokens = Number(item.output_tokens) || 0;
+                        const inferenceCost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
+                        return {
+                          ...item,
+                          infrastructure_cost: infrastructureCost,
+                          combined_total_cost: inferenceCost + infrastructureCost
+                        };
+                      }), usageSortConfig).map((item, index) => {
                         const inputTokens = Number(item.input_tokens) || 0;
                         const outputTokens = Number(item.output_tokens) || 0;
                         const totalTokens = Number(item.total_tokens) || 0;
                         const tokenLimitValue = item.token_limit ? Number(item.token_limit) : null;
                         const usagePercentage = calculateUsagePercentage(totalTokens, tokenLimitValue);
-                        const totalCost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
+                        const inferenceCost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
+                        const infrastructureCost = item.infrastructure_cost || 0;
+                        const totalCost = inferenceCost + infrastructureCost;
                         return (
                           <tr 
                             key={item.aggregation_key} 
@@ -809,6 +858,8 @@ function App() {
                             <td className="px-3 py-4 text-sm text-default-600">{outputTokens.toLocaleString()}</td>
                             <td className="px-3 py-4 text-sm font-medium">{totalTokens.toLocaleString()}</td>
                             <td className="px-3 py-4 text-sm text-default-600">{Number(item.request_count) || 0}</td>
+                            <td className="px-3 py-4 text-sm font-mono text-default-600">${inferenceCost.toFixed(6)}</td>
+                            <td className="px-3 py-4 text-sm font-mono text-default-600">${infrastructureCost.toFixed(6)}</td>
                             <td className="px-3 py-4 text-sm font-mono font-semibold text-success">${totalCost.toFixed(6)}</td>
                             <td className="px-3 py-4 text-sm">
                               {usagePercentage !== null ? (
@@ -829,10 +880,10 @@ function App() {
                 {/* Cost Summary */}
                 <div className="rounded-xl bg-success-soft p-6">
                   <h3 className="font-semibold mb-4">💰 Cost Summary</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className="text-sm text-muted">Total Cost (All Tenants)</p>
-                      <p className="text-3xl font-bold font-mono">
+                      <p className="text-sm text-muted">Inference Cost</p>
+                      <p className="text-2xl font-bold font-mono">
                         ${tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')).reduce((sum, item) => {
                           const inputTokens = Number(item.input_tokens) || 0;
                           const outputTokens = Number(item.output_tokens) || 0;
@@ -841,31 +892,71 @@ function App() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted">Pricing</p>
-                      <p className="text-sm font-mono">Input: $0.003/1K tokens | Output: $0.015/1K tokens</p>
+                      <p className="text-sm text-muted">Infrastructure Cost</p>
+                      <p className="text-2xl font-bold font-mono">
+                        ${infrastructureCosts.reduce((sum, item) => sum + (Number(item.infrastructure_cost) || 0), 0).toFixed(6)}
+                      </p>
                     </div>
+                    <div>
+                      <p className="text-sm text-muted">Total Cost (All Tenants)</p>
+                      <p className="text-3xl font-bold font-mono text-success">
+                        ${(tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')).reduce((sum, item) => {
+                          const inputTokens = Number(item.input_tokens) || 0;
+                          const outputTokens = Number(item.output_tokens) || 0;
+                          return sum + (Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000)));
+                        }, 0) + infrastructureCosts.reduce((sum, item) => sum + (Number(item.infrastructure_cost) || 0), 0)).toFixed(6)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-success/20">
+                    <p className="text-sm text-muted">Pricing</p>
+                    <p className="text-sm font-mono">Input: $0.003/1K tokens | Output: $0.015/1K tokens</p>
                   </div>
                 </div>
 
                 {/* Cost Chart */}
                 <div className="rounded-xl bg-surface-secondary p-6">
-                  <h3 className="font-semibold mb-4">📊 Cost per Tenant</h3>
+                  <h3 className="font-semibold mb-4">📊 Total Cost per Tenant</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart
                       data={tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')).map(item => {
                         const inputTokens = Number(item.input_tokens) || 0;
                         const outputTokens = Number(item.output_tokens) || 0;
-                        const cost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
-                        return { tenant: item.tenant_id, cost: parseFloat(cost.toFixed(6)), requests: Number(item.request_count) || 0 };
-                      }).sort((a, b) => b.cost - a.cost)}
+                        const inferenceCost = Number(item.total_cost) || ((inputTokens * 0.003 / 1000) + (outputTokens * 0.015 / 1000));
+                        const infraCostData = infrastructureCosts.find(ic => ic.tenant_id === item.tenant_id);
+                        const infraCost = infraCostData ? Number(infraCostData.infrastructure_cost) || 0 : 0;
+                        const totalCost = inferenceCost + infraCost;
+                        return { 
+                          tenant: item.tenant_id, 
+                          totalCost: parseFloat(totalCost.toFixed(6)),
+                          inferenceCost: parseFloat(inferenceCost.toFixed(6)),
+                          infraCost: parseFloat(infraCost.toFixed(6)),
+                          requests: Number(item.request_count) || 0 
+                        };
+                      }).sort((a, b) => b.totalCost - a.totalCost)}
                       margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="tenant" angle={-45} textAnchor="end" height={80} style={{ fontSize: '12px' }} />
                       <YAxis label={{ value: 'Cost ($)', angle: -90, position: 'insideLeft' }} style={{ fontSize: '12px' }} />
-                      <Tooltip formatter={(value, name) => name === 'cost' ? [`$${value}`, 'Total Cost'] : [value, name]} />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-surface border border-divider rounded-lg p-3 shadow-lg">
+                                <p className="font-semibold mb-2">{label}</p>
+                                <p className="text-sm font-mono">Inference: ${data.inferenceCost}</p>
+                                <p className="text-sm font-mono">Infrastructure: ${data.infraCost}</p>
+                                <p className="text-sm font-mono font-semibold text-success">Total: ${data.totalCost}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
                       <Legend />
-                      <Bar dataKey="cost" name="Total Cost" fill="var(--color-accent)">
+                      <Bar dataKey="totalCost" name="Total Cost" fill="var(--color-accent)">
                         {tokenUsage.filter(item => item.aggregation_key?.startsWith('tenant:')).map((_, index) => (
                           <Cell key={`cell-${index}`} fill={`hsl(${250 + index * 30}, 70%, 60%)`} />
                         ))}
@@ -948,7 +1039,7 @@ function App() {
                     onChange={(key) => setAgentConfig({ ...agentConfig, modelId: key })}
                   >
                     <Label>Model ID</Label>
-                    <Select.Trigger>
+                    <Select.Trigger className="modal-select-trigger">
                       <Select.Value />
                       <Select.Indicator />
                     </Select.Trigger>
@@ -966,8 +1057,8 @@ function App() {
                     <TextArea placeholder="You are a helpful AI assistant." rows={3} value={agentConfig.systemPrompt} disabled={deployLoading} />
                   </TextField>
 
-                  <Checkbox isSelected={useCustomTemplate} onChange={setUseCustomTemplate} isDisabled={deployLoading}>
-                    <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+                  <Checkbox isSelected={useCustomTemplate} onChange={setUseCustomTemplate} isDisabled={deployLoading} className="modal-checkbox">
+                    <Checkbox.Control className="modal-checkbox-control"><Checkbox.Indicator /></Checkbox.Control>
                     <Label>Use Custom Template from GitHub</Label>
                   </Checkbox>
 
