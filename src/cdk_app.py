@@ -180,7 +180,7 @@ stack = BedrockAgentStack(
     "BedrockAgentStack",
     env=cdk.Environment(
         account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
-        region="us-west-2"
+        region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2")
     )
 )
 

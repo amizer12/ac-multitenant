@@ -23,9 +23,9 @@ import time
 from datetime import datetime
 
 # Get configuration from environment variables or use defaults
-REGION = os.environ.get('AWS_REGION', 'us-west-2')
+REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
 AGENT_NAME = os.environ.get('AGENT_NAME', 'sqs')
-BUCKET_NAME = os.environ.get('BUCKET_NAME', f'bedrock-agentcore-code-803141810841-{REGION}')
+BUCKET_NAME = os.environ.get('BUCKET_NAME', '')
 QUEUE_URL = os.environ.get('QUEUE_URL', '')
 ROLE_ARN = os.environ.get('ROLE_ARN', '')
 
@@ -307,9 +307,9 @@ MODEL_ID = 'MODEL_ID_VALUE'
 SYSTEM_PROMPT = '''SYSTEM_PROMPT_VALUE'''
 
 # Initialize clients
-sqs = boto3.client('sqs', region_name='us-west-2')
-dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
-config_table = dynamodb.Table('agent-configurations')
+sqs = boto3.client('sqs', region_name=REGION)
+dynamodb = boto3.resource('dynamodb', region_name=REGION)
+config_table = dynamodb.Table(os.environ.get('AGENT_CONFIG_TABLE_NAME', 'agent-configurations'))
 
 # Initialize agent with deployment-time config
 agent = Agent(
@@ -761,8 +761,8 @@ def lambda_handler(event, context):
         # Store agent details in DynamoDB for later retrieval
         try:
             dynamodb = boto3.resource('dynamodb')
-            agent_table = dynamodb.Table('agent-details-v2')
-            config_table = dynamodb.Table('agent-configurations')
+            agent_table = dynamodb.Table(os.environ.get('AGENT_DETAILS_TABLE_NAME', 'agent-details-v2'))
+            config_table = dynamodb.Table(os.environ.get('AGENT_CONFIG_TABLE_NAME', 'agent-configurations'))
             
             # Convert config to DynamoDB-compatible format (Float -> Decimal)
             from decimal import Decimal

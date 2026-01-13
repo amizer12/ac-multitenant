@@ -83,6 +83,8 @@ class LambdasConstruct(Construct):
                 "QUEUE_URL": usage_queue.queue_url,
                 "ROLE_ARN": agent_role_arn,
                 "BUCKET_NAME": code_bucket.bucket_name,
+                "AGENT_CONFIG_TABLE_NAME": agent_config_table.table_name,
+                "AGENT_DETAILS_TABLE_NAME": agent_details_table.table_name,
             },
         )
         code_bucket.grant_read_write(self.build_deploy_agent)
