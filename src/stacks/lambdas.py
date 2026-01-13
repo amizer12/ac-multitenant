@@ -116,23 +116,25 @@ class LambdasConstruct(Construct):
                 resources=[agent_role_arn],
             )
         )
-        # Identity service-linked role (required for all runtimes created after Oct 13, 2025)
         self.build_deploy_agent.add_to_role_policy(
             iam.PolicyStatement(
-                sid="CreateBedrockAgentCoreRuntimeIdentityServiceLinkedRole",
-                actions=["iam:CreateServiceLinkedRole"],
-                resources=["arn:aws:iam::*:role/aws-service-role/runtime-identity.bedrock-agentcore.amazonaws.com/AWSServiceRoleForBedrockAgentCoreRuntimeIdentity"],
+                actions=[
+                    "iam:CreateServiceLinkedRole",
+                ],
+                resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
                 conditions={
-                    "StringEquals": {
-                        "iam:AWSServiceName": "runtime-identity.bedrock-agentcore.amazonaws.com"
+                    "StringLike": {
+                        "iam:AWSServiceName": "bedrock-agentcore.amazonaws.com"
                     }
                 }
             )
         )
         self.build_deploy_agent.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["iam:GetRole"],
-                resources=["arn:aws:iam::*:role/aws-service-role/runtime-identity.bedrock-agentcore.amazonaws.com/*"],
+                actions=[
+                    "iam:GetRole",
+                ],
+                resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
             )
         )
         self.build_deploy_agent.add_to_role_policy(
