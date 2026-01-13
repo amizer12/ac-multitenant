@@ -90,6 +90,14 @@ class FrontendConstruct(Construct):
             print("Frontend build not found. Run 'cd frontend && npm install && npm run build' to build the frontend.")
         
         # Config injector Lambda
+        config_injector_log_group = logs.LogGroup(
+            self,
+            "ConfigInjectorLogGroup",
+            log_group_name="/aws/lambda/frontend-config-injector",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        
         config_injector = lambda_.Function(
             self,
             "ConfigInjectorLambda",
@@ -98,7 +106,7 @@ class FrontendConstruct(Construct):
             handler="handler.lambda_handler",
             code=lambda_.Code.from_asset(os.path.join(cdk_app_dir, "lambda_functions/config_injector")),
             timeout=Duration.seconds(60),
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            log_group=config_injector_log_group,
             memory_size=256,
             environment={
                 "API_ENDPOINT": api.url,

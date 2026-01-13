@@ -5,6 +5,7 @@ from constructs import Construct
 from aws_cdk import (
     Duration,
     Size,
+    RemovalPolicy,
     aws_lambda as lambda_,
     aws_lambda_event_sources as lambda_event_sources,
     aws_iam as iam,
@@ -67,6 +68,14 @@ class LambdasConstruct(Construct):
         )
         
         # Build and deploy agent Lambda (special config - high memory/storage)
+        build_deploy_log_group = logs.LogGroup(
+            self,
+            "BuildDeployAgentLogGroup",
+            log_group_name="/aws/lambda/build-deploy-bedrock-agent",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        
         self.build_deploy_agent = lambda_.Function(
             self,
             "BuildDeployAgentLambda",
@@ -76,7 +85,7 @@ class LambdasConstruct(Construct):
             code=lambda_.Code.from_asset(os.path.join(cdk_app_dir, "lambda_functions/build_deploy_agent")),
             timeout=Duration.minutes(15),
             memory_size=3008,
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            log_group=build_deploy_log_group,
             ephemeral_storage_size=Size.mebibytes(10240),
             environment={
                 "AGENT_NAME": "sqs",
@@ -105,6 +114,15 @@ class LambdasConstruct(Construct):
             iam.PolicyStatement(
                 actions=["iam:PassRole"],
                 resources=[agent_role_arn],
+            )
+        )
+        self.build_deploy_agent.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:CreateServiceLinkedRole",
+                    "iam:GetRole",
+                ],
+                resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
             )
         )
         self.build_deploy_agent.add_to_role_policy(
@@ -229,6 +247,15 @@ class LambdasConstruct(Construct):
         environment: dict = None,
     ) -> lambda_.Function:
         """Factory method to create Lambda functions with common configuration."""
+        # Create log group explicitly
+        log_group = logs.LogGroup(
+            self,
+            f"{id}LogGroup",
+            log_group_name=f"/aws/lambda/{function_name}",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+        
         return lambda_.Function(
             self,
             id,
@@ -238,6 +265,6 @@ class LambdasConstruct(Construct):
             code=lambda_.Code.from_asset(os.path.join(self.cdk_app_dir, handler_path)),
             timeout=Duration.seconds(timeout_seconds),
             memory_size=memory_size,
-            log_retention=logs.RetentionDays.ONE_WEEK,
+            log_group=log_group,
             environment=environment or {},
         )
