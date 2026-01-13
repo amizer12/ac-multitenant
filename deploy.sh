@@ -27,7 +27,9 @@ echo "   - Infrastructure (API Gateway, Lambda, DynamoDB, SQS)"
 echo "   - Frontend (S3 + CloudFront)"
 echo "   - Auto-generating config.js with API credentials"
 echo ""
+cd src
 cdk bootstrap
+cd ..
 cdk deploy --require-approval never --app "python3 src/cdk_app.py"
 
 echo ""
