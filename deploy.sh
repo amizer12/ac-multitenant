@@ -5,6 +5,12 @@ set -e  # Exit on error
 echo "🚀 Building and deploying Bedrock Agent Stack..."
 echo ""
 
+# Install Python CDK dependencies
+echo "📦 Installing Python CDK dependencies..."
+pip install -r src/cdk_requirements.txt
+
+echo ""
+
 # Build frontend
 echo "📦 Installing frontend dependencies..."
 cd frontend
@@ -27,7 +33,7 @@ cdk deploy --require-approval never --app "python3 src/cdk_app.py"
 echo ""
 echo "✅ Deployment complete!"
 echo ""
-echo "📋 Stack Outputs:"
+echo "� Stack nOutputs:"
 echo "   Check the outputs above for:"
 echo "   - Frontend URL (CloudFront)"
 echo "   - API Endpoint"
