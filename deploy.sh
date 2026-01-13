@@ -28,8 +28,8 @@ echo "   - Frontend (S3 + CloudFront)"
 echo "   - Auto-generating config.js with API credentials"
 echo ""
 
-# Set region to us-east-1 (or use AWS_DEFAULT_REGION if set)
-export CDK_DEFAULT_REGION=${AWS_DEFAULT_REGION: us-east-1}
+# Set region to us-west-2 (or use AWS_DEFAULT_REGION if set)
+export CDK_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
 echo "   Deploying to region: $CDK_DEFAULT_REGION"
 echo ""
 
