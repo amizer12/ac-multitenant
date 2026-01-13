@@ -70,98 +70,6 @@ Frontend → API Gateway → infrastructure_costs → Cost Explorer (tenantId ta
 └── README.md                # This file
 ```
 
-### agent-tools-repo/
-Modular tool repository for composing AI agents with various capabilities. Serves as a reference implementation for the agent deployment system.
-
-**Purpose:**
-- Provides a catalog of reusable tools (web search, calculator, database query, email sender, etc.)
-- Demonstrates the tool composition pattern for agent deployment
-- Serves as a template for creating custom tool repositories
-
-**Structure:**
-```
-agent-tools-repo/ac_tools/
-├── catalog.json              # Tool catalog with metadata
-├── templates/                # Base agent templates
-└── tools/                    # Individual tool implementations
-    ├── web-search/
-    ├── calculator/
-    ├── database-query/
-    └── email-sender/
-```
-
-**Usage:**
-When deploying an agent through the dashboard, you can reference this repository (or your own fork) to load and select tools for your agent. The deployment system fetches the `catalog.json`, displays available tools, and bundles selected tools with your agent code.
-
-> **Note:** This directory is excluded from deployment via `.gitignore` and serves as a development reference only.
-
-### docs/
-Contains architecture diagrams and documentation.
-
-**Files:**
-- `architecture.drawio` - Draw.io diagram showing the complete system architecture with multi-provider support
-
-### frontend/
-React-based dashboard application built with Vite, HeroUI v3, and Tailwind CSS.
-
-**Structure:**
-```
-frontend/
-├── src/
-│   ├── App.jsx              # Main application component
-│   ├── App.css              # Application styles
-│   ├── main.jsx             # Application entry point
-│   └── utils/               # Utility functions (validation, etc.)
-├── public/
-│   └── config.js            # Auto-generated API configuration
-├── dist/                    # Build output (deployed to S3)
-├── package.json             # Dependencies and scripts
-└── vite.config.js           # Vite configuration
-```
-
-**Features:**
-- Dark/light mode toggle
-- Real-time token usage tracking with charts
-- Infrastructure cost monitoring
-- Agent deployment and management UI
-- Auto-refresh every 10 seconds
-
-### src/
-Backend infrastructure defined using AWS CDK (Python).
-
-**Structure:**
-```
-src/
-├── lambda_functions/        # Lambda function implementations
-│   ├── async_deploy_agent/  # Async agent deployment handler
-│   ├── build_deploy_agent/  # Agent build and deployment
-│   ├── config_injector/     # Auto-inject API config to frontend
-│   ├── delete_agent/        # Delete agent handler
-│   ├── dynamodb_stream_processor/ # Token aggregation
-│   ├── get_agent_details/   # Get agent info
-│   ├── infrastructure_costs/ # Cost Explorer integration
-│   ├── invoke_agent/        # Agent invocation with limit checks
-│   ├── list_agents/         # List all agents
-│   ├── set_tenant_limit/    # Set token limits per tenant
-│   ├── sqs_to_dynamodb/     # Token usage processor
-│   ├── token_usage/         # Get usage statistics
-│   └── update_agent_config/ # Update agent configuration
-├── stacks/                  # CDK stack definitions
-│   ├── agent_runtime.py     # Bedrock Agent Core resources
-│   ├── api.py               # API Gateway configuration
-│   ├── database.py          # DynamoDB tables
-│   ├── frontend.py          # S3 + CloudFront setup
-│   ├── lambdas.py           # Lambda function definitions
-│   └── messaging.py         # SQS queue configuration
-├── cdk_app.py              # CDK application entry point
-└── cdk.json                # CDK configuration
-```
-
-**Key Components:**
-- **Lambda Functions**: 12 functions handling agent lifecycle, invocation, and cost tracking
-- **CDK Stacks**: Modular infrastructure definitions for API, database, frontend, and messaging
-- **Auto-Configuration**: Automatic injection of API credentials into frontend config
-
 ## Prerequisites
 
 - AWS CLI configured with credentials
@@ -175,6 +83,8 @@ src/
 ### One-Command Deployment
 
 ```bash
+chmod a+x deploy.sh
+
 ./deploy.sh
 ```
 
