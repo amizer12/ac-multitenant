@@ -57,7 +57,7 @@ class FrontendConstruct(Construct):
             self,
             "FrontendDistribution",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3BucketOrigin(self.bucket, origin_access_identity=oai),
+                origin=origins.S3Origin(self.bucket, origin_access_identity=oai),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
             ),
             default_root_object="index.html",
