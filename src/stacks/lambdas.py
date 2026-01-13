@@ -120,6 +120,18 @@ class LambdasConstruct(Construct):
             iam.PolicyStatement(
                 actions=[
                     "iam:CreateServiceLinkedRole",
+                ],
+                resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
+                conditions={
+                    "StringLike": {
+                        "iam:AWSServiceName": "bedrock-agentcore.amazonaws.com"
+                    }
+                }
+            )
+        )
+        self.build_deploy_agent.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
                     "iam:GetRole",
                 ],
                 resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
