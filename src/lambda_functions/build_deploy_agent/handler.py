@@ -23,7 +23,7 @@ import time
 from datetime import datetime
 
 # Get configuration from environment variables or use defaults
-REGION = os.environ.get('AWS_REGION', 'us-west-2')
+REGION = AWS_DEFAULT_REGION
 AGENT_NAME = os.environ.get('AGENT_NAME', 'sqs')
 BUCKET_NAME = os.environ.get('BUCKET_NAME', f'bedrock-agentcore-code-803141810841-{REGION}')
 QUEUE_URL = os.environ.get('QUEUE_URL', '')
@@ -307,8 +307,8 @@ MODEL_ID = 'MODEL_ID_VALUE'
 SYSTEM_PROMPT = '''SYSTEM_PROMPT_VALUE'''
 
 # Initialize clients
-sqs = boto3.client('sqs', region_name='us-west-2')
-dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+sqs = boto3.client('sqs')
+dynamodb = boto3.resource('dynamodb')
 config_table = dynamodb.Table('agent-configurations')
 
 # Initialize agent with deployment-time config

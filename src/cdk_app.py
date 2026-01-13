@@ -175,12 +175,18 @@ class BedrockAgentStack(Stack):
 
 app = cdk.App()
 
+# Get region from environment variables with fallback chain:
+# 1. AWS_DEFAULT_REGION (set by user or deploy script)
+# 2. CDK_DEFAULT_REGION (CDK standard)
+# 3. us-west-2 (default fallback)
+deployment_region = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("CDK_DEFAULT_REGION") or "us-west-2"
+
 stack = BedrockAgentStack(
     app,
     "BedrockAgentStack",
     env=cdk.Environment(
         account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
-        region="us-west-2"
+        region=deployment_region
     )
 )
 
