@@ -35,18 +35,9 @@ class FrontendConstruct(Construct):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # S3 access logs bucket
-        access_logs_bucket = s3.Bucket(
-            self,
-            "FrontendAccessLogsBucket",
-            bucket_name=f"bedrock-agent-dashboard-logs-{account_id}-{region}",
-            removal_policy=RemovalPolicy.DESTROY,
-            auto_delete_objects=True,
-            enforce_ssl=True,
-            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
-        )
-
         # S3 bucket for frontend
+        # Note: Server access logging disabled to avoid deletion issues
+        # For production, consider using CloudWatch Logs or S3 Inventory instead
         self.bucket = s3.Bucket(
             self,
             "FrontendBucket",
@@ -54,8 +45,6 @@ class FrontendConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             enforce_ssl=True,
-            server_access_logs_bucket=access_logs_bucket,
-            server_access_logs_prefix="frontend-bucket/",
         )
 
         # Origin Access Identity for CloudFront
