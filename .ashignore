@@ -1,8 +1,0 @@
-# ASH Security Scan - Ignore scan output directories and test data
-ash-security-scan/
-cdk-nag-test/
-cdk.out/
-src/cdk.out/
-frontend/node_modules/
-frontend/dist/
-.git/
