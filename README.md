@@ -106,17 +106,6 @@ This script will:
 - **CloudFront**: CDN for frontend distribution
 - **IAM Roles**: With least-privilege permissions
 
-### Automatic Configuration Injection
-
-The deployment automatically:
-- Retrieves the API Gateway endpoint URL
-- Retrieves the API key value
-- Generates `config.js` with these credentials
-- Uploads it to S3
-- Invalidates CloudFront cache
-
-**No manual configuration needed!** The frontend is ready to use immediately after deployment.
-
 ## Stack Outputs
 
 After deployment, you'll see outputs including:
