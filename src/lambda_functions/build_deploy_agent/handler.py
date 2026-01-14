@@ -19,16 +19,16 @@ subprocess.check_call(
         "uv",
         "requests",
         "-t",
-        "/tmp/packages",
+        "/tmp/packages",  # nosec B108 - Lambda ephemeral storage
     ]
 )
-sys.path.insert(0, "/tmp/packages")
+sys.path.insert(0, "/tmp/packages")  # nosec B108 - Lambda ephemeral storage
 
 # Add uv to PATH and set cache directory
-os.environ["PATH"] = f"/tmp/packages/bin:{os.environ.get('PATH', '')}"
-os.environ["UV_CACHE_DIR"] = "/tmp/.uv_cache"
-os.environ["UV_PYTHON_INSTALL_DIR"] = "/tmp/.uv_python"
-os.environ["HOME"] = "/tmp"
+os.environ["PATH"] = f"/tmp/packages/bin:{os.environ.get('PATH', '')}"  # nosec B108
+os.environ["UV_CACHE_DIR"] = "/tmp/.uv_cache"  # nosec B108 - Lambda ephemeral storage
+os.environ["UV_PYTHON_INSTALL_DIR"] = "/tmp/.uv_python"  # nosec B108 - Lambda ephemeral storage
+os.environ["HOME"] = "/tmp"  # nosec B108 - Lambda ephemeral storage
 
 import boto3  # noqa: E402
 import requests  # noqa: E402
@@ -448,7 +448,7 @@ def build_agent_project(
     model_id = config.get("modelId", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
     system_prompt = config.get("systemPrompt", "You are a helpful AI assistant.")
 
-    project_dir = "/tmp/agentcore_runtime_direct_deploy"
+    project_dir = "/tmp/agentcore_runtime_direct_deploy"  # nosec B108 - Lambda ephemeral storage
     package_file = "deployment.zip"
     additional_dependencies = []
 

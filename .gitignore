@@ -22,6 +22,7 @@ yarn-error.log*
 /frontend/.env.test.local
 /frontend/.env.production.local
 /frontend/dist/*
+/ash-scan-results/*
 
 # IDE / Editor
 .vscode/
@@ -32,6 +33,7 @@ yarn-error.log*
 .pytest_cache/
 __pycache__/
 *.pyc
+.ruff_cache/
 
 # OS files
 .DS_Store
@@ -40,5 +42,13 @@ Thumbs.db
 # Agent tools
 agent-tools-repo/
 
-
+# ASH Security Scan (run externally, not in repo)
 ash-security-scan/
+
+# ASH scan reports and results
+ASH_SCAN_RESULTS.md
+CLEAN_ASH_SCAN_RESULTS.md
+FINAL_ASH_SCAN_RESULTS.md
+.ash_config.yaml
+.ash_suppressions.yaml
+.ashignore
