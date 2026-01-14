@@ -1,4 +1,4 @@
-# AWS Bedrock Agent Core Full-Stack Web Application
+# AWS Bedrock Agent Core Multitenant Platform
 
 A multi-tenant SaaS platform for deploying, managing, and invoking AI agents powered by AWS Bedrock Agent Core.
 
@@ -355,3 +355,4 @@ The deployment system will fetch your `catalog.json`, display your custom tools,
 ## License
 
 MIT
+
