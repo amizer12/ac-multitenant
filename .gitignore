@@ -6,6 +6,9 @@ cdk.context.json
 src/cdk_complete.json
 src/stacks/__pycache__
 
+# CDK Nag Testing (external tool, not part of repo)
+cdk-nag-test/
+
 # Node / React
 node_modules/
 npm-debug.log*
