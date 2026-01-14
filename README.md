@@ -2,6 +2,10 @@
 
 A multi-tenant SaaS platform for deploying, managing, and invoking AI agents powered by AWS Bedrock Agent Core.
 
+<p align="center">
+  <img src="docs/main.png" alt="Dashboard Main View" width="600">
+</p>
+
 ## Features
 
 - **Deploy Custom AI Agents**: Configure agents with custom models (Claude Sonnet 4.5), system prompts, and modular tools
@@ -13,6 +17,10 @@ A multi-tenant SaaS platform for deploying, managing, and invoking AI agents pow
 - **Total Cost Dashboard**: View combined inference + infrastructure costs per tenant with detailed breakdowns
 - **Agent Management**: List, invoke, update, and delete agents via REST API
 - **Interactive Dashboard**: React-based UI with dark mode, charts, auto-refresh, and real-time updates
+
+<p align="center">
+  <img src="docs/custom.png" alt="Agent Deployment" width="400">
+</p>
 
 ## Architecture
 
@@ -248,9 +256,13 @@ AWS_DEFAULT_REGION=eu-central-1 cdk destroy --app "python3 src/cdk_app.py"
 - DynamoDB tables are deleted with their data
 - No manual cleanup required
 
-## Creating Custom Agent Tools (Optional)
+## Adding your cusotm tool into deployment (Optional)
 
-To deploy agents with your own custom tools, you can create a custom tool repository based on the included `agent-tools-repo` template.
+To deploy agents with your own custom tools, create a custom tool repository based on the included `agent-tools-repo` template. During agent deployment, provide the URL to your repository, load your tool definitions, select the applicable tools, and deploy the agent with them.
+
+<p align="center">
+  <img src="docs/custom_tools.png" alt="Custom Tools Configuration" width="600">
+</p>
 
 ### 1. Clone the Agent Tools Repository
 
