@@ -6,10 +6,10 @@ from aws_cdk import RemovalPolicy, aws_dynamodb as dynamodb
 
 class DatabaseConstruct(Construct):
     """Construct for all DynamoDB tables used in the application."""
-    
+
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
+
         # Token usage table with streams enabled
         self.usage_table = dynamodb.Table(
             self,
@@ -26,7 +26,7 @@ class DatabaseConstruct(Construct):
             stream=dynamodb.StreamViewType.NEW_IMAGE,
             point_in_time_recovery=True,
         )
-        
+
         # Token aggregation table
         self.aggregation_table = dynamodb.Table(
             self,
@@ -39,7 +39,7 @@ class DatabaseConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
             point_in_time_recovery=True,
         )
-        
+
         # Agent configurations table (runtime config)
         self.agent_config_table = dynamodb.Table(
             self,
@@ -55,7 +55,7 @@ class DatabaseConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
             point_in_time_recovery=True,
         )
-        
+
         # Agent details table
         self.agent_details_table = dynamodb.Table(
             self,

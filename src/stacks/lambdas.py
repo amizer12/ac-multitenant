@@ -18,7 +18,7 @@ from aws_cdk import (
 
 class LambdasConstruct(Construct):
     """Construct for all Lambda functions used in the application."""
-    
+
     def __init__(
         self,
         scope: Construct,
@@ -31,12 +31,12 @@ class LambdasConstruct(Construct):
         usage_queue: sqs.Queue,
         code_bucket: s3.Bucket,
         agent_role_arn: str,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
+
         self.cdk_app_dir = cdk_app_dir
-        
+
         # SQS to DynamoDB processor
         self.sqs_processor = self._create_lambda(
             "SQSToDynamoDBProcessor",
@@ -48,7 +48,7 @@ class LambdasConstruct(Construct):
         self.sqs_processor.add_event_source(
             lambda_event_sources.SqsEventSource(usage_queue, batch_size=10)
         )
-        
+
         # DynamoDB stream processor
         self.stream_processor = self._create_lambda(
             "DynamoDBStreamProcessor",
@@ -66,7 +66,7 @@ class LambdasConstruct(Construct):
                 retry_attempts=3,
             )
         )
-        
+
         # Build and deploy agent Lambda (special config - high memory/storage)
         build_deploy_log_group = logs.LogGroup(
             self,
@@ -75,14 +75,16 @@ class LambdasConstruct(Construct):
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
-        
+
         self.build_deploy_agent = lambda_.Function(
             self,
             "BuildDeployAgentLambda",
             function_name="build-deploy-bedrock-agent",
             runtime=lambda_.Runtime.PYTHON_3_10,
             handler="handler.lambda_handler",
-            code=lambda_.Code.from_asset(os.path.join(cdk_app_dir, "lambda_functions/build_deploy_agent")),
+            code=lambda_.Code.from_asset(
+                os.path.join(cdk_app_dir, "lambda_functions/build_deploy_agent")
+            ),
             timeout=Duration.minutes(15),
             memory_size=3008,
             log_group=build_deploy_log_group,
@@ -99,7 +101,7 @@ class LambdasConstruct(Construct):
         code_bucket.grant_read_write(self.build_deploy_agent)
         agent_details_table.grant_write_data(self.build_deploy_agent)
         agent_config_table.grant_read_write_data(self.build_deploy_agent)
-        
+
         # Add Bedrock and IAM permissions
         self.build_deploy_agent.add_to_role_policy(
             iam.PolicyStatement(
@@ -121,12 +123,14 @@ class LambdasConstruct(Construct):
                 actions=[
                     "iam:CreateServiceLinkedRole",
                 ],
-                resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
+                resources=[
+                    "arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"
+                ],
                 conditions={
                     "StringLike": {
                         "iam:AWSServiceName": "bedrock-agentcore.amazonaws.com"
                     }
-                }
+                },
             )
         )
         self.build_deploy_agent.add_to_role_policy(
@@ -134,26 +138,33 @@ class LambdasConstruct(Construct):
                 actions=[
                     "iam:GetRole",
                 ],
-                resources=["arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"],
+                resources=[
+                    "arn:aws:iam::*:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"
+                ],
             )
         )
         self.build_deploy_agent.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["ce:ListCostAllocationTags", "ce:UpdateCostAllocationTagsStatus"],
+                actions=[
+                    "ce:ListCostAllocationTags",
+                    "ce:UpdateCostAllocationTagsStatus",
+                ],
                 resources=["*"],
             )
         )
-        
+
         # Async deploy Lambda
         self.async_deploy = self._create_lambda(
             "AsyncDeployLambda",
             "async-deploy-agent",
             "lambda_functions/async_deploy_agent",
             timeout_seconds=10,
-            environment={"BUILD_DEPLOY_FUNCTION_NAME": self.build_deploy_agent.function_name},
+            environment={
+                "BUILD_DEPLOY_FUNCTION_NAME": self.build_deploy_agent.function_name
+            },
         )
         self.build_deploy_agent.grant_invoke(self.async_deploy)
-        
+
         # Token usage Lambda
         self.token_usage = self._create_lambda(
             "TokenUsageLambda",
@@ -162,7 +173,7 @@ class LambdasConstruct(Construct):
             environment={"AGGREGATION_TABLE_NAME": aggregation_table.table_name},
         )
         aggregation_table.grant_read_data(self.token_usage)
-        
+
         # Invoke agent Lambda
         self.invoke_agent = self._create_lambda(
             "InvokeAgentLambda",
@@ -179,7 +190,7 @@ class LambdasConstruct(Construct):
             )
         )
         aggregation_table.grant_read_data(self.invoke_agent)
-        
+
         # Get agent details Lambda
         self.get_agent = self._create_lambda(
             "GetAgentLambda",
@@ -188,7 +199,7 @@ class LambdasConstruct(Construct):
             environment={"AGENT_DETAILS_TABLE_NAME": agent_details_table.table_name},
         )
         agent_details_table.grant_read_data(self.get_agent)
-        
+
         # List agents Lambda
         self.list_agents = self._create_lambda(
             "ListAgentsLambda",
@@ -197,7 +208,7 @@ class LambdasConstruct(Construct):
             environment={"AGENT_DETAILS_TABLE_NAME": agent_details_table.table_name},
         )
         agent_details_table.grant_read_data(self.list_agents)
-        
+
         # Delete agent Lambda
         self.delete_agent = self._create_lambda(
             "DeleteAgentLambda",
@@ -209,11 +220,14 @@ class LambdasConstruct(Construct):
         agent_details_table.grant_read_write_data(self.delete_agent)
         self.delete_agent.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["bedrock-agentcore:DeleteAgentRuntime", "bedrock-agentcore:GetAgentRuntime"],
+                actions=[
+                    "bedrock-agentcore:DeleteAgentRuntime",
+                    "bedrock-agentcore:GetAgentRuntime",
+                ],
                 resources=["*"],
             )
         )
-        
+
         # Update config Lambda
         self.update_config = self._create_lambda(
             "UpdateConfigLambda",
@@ -222,7 +236,7 @@ class LambdasConstruct(Construct):
             environment={"AGENT_CONFIG_TABLE_NAME": agent_config_table.table_name},
         )
         agent_config_table.grant_read_write_data(self.update_config)
-        
+
         # Set tenant limit Lambda
         self.set_tenant_limit = self._create_lambda(
             "SetTenantLimitLambda",
@@ -231,7 +245,7 @@ class LambdasConstruct(Construct):
             environment={"AGGREGATION_TABLE_NAME": aggregation_table.table_name},
         )
         aggregation_table.grant_read_write_data(self.set_tenant_limit)
-        
+
         # Infrastructure costs Lambda
         self.infrastructure_costs = self._create_lambda(
             "InfrastructureCostsLambda",
@@ -248,7 +262,7 @@ class LambdasConstruct(Construct):
                 resources=["*"],
             )
         )
-    
+
     def _create_lambda(
         self,
         id: str,
@@ -267,7 +281,7 @@ class LambdasConstruct(Construct):
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
-        
+
         return lambda_.Function(
             self,
             id,

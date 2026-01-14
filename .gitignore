@@ -21,7 +21,7 @@ yarn-error.log*
 /frontend/.env.development.local
 /frontend/.env.test.local
 /frontend/.env.production.local
-/frontend/dist
+/frontend/dist/*
 
 # IDE / Editor
 .vscode/

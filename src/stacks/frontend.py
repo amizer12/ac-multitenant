@@ -20,7 +20,7 @@ from aws_cdk import (
 
 class FrontendConstruct(Construct):
     """Construct for frontend hosting with S3, CloudFront, and config injection."""
-    
+
     def __init__(
         self,
         scope: Construct,
@@ -31,10 +31,10 @@ class FrontendConstruct(Construct):
         cdk_app_dir: str,
         api: apigateway.RestApi,
         api_key: apigateway.ApiKey,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
+
         # S3 access logs bucket
         access_logs_bucket = s3.Bucket(
             self,
@@ -45,7 +45,7 @@ class FrontendConstruct(Construct):
             enforce_ssl=True,
             object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
         )
-        
+
         # S3 bucket for frontend
         self.bucket = s3.Bucket(
             self,
@@ -57,15 +57,13 @@ class FrontendConstruct(Construct):
             server_access_logs_bucket=access_logs_bucket,
             server_access_logs_prefix="frontend-bucket/",
         )
-        
+
         # Origin Access Identity for CloudFront
         oai = cloudfront.OriginAccessIdentity(
-            self,
-            "FrontendOAI",
-            comment="OAI for Bedrock Agent Dashboard"
+            self, "FrontendOAI", comment="OAI for Bedrock Agent Dashboard"
         )
         self.bucket.grant_read(oai)
-        
+
         # CloudFront distribution
         self.distribution = cloudfront.Distribution(
             self,
@@ -85,24 +83,30 @@ class FrontendConstruct(Construct):
                     http_status=403,
                     response_http_status=200,
                     response_page_path="/index.html",
-                )
+                ),
             ],
         )
-        
+
         # Deploy frontend files (if they exist)
         frontend_deployment = None
         try:
             frontend_deployment = s3_deployment.BucketDeployment(
                 self,
                 "DeployFrontend",
-                sources=[s3_deployment.Source.asset(os.path.join(project_root, "frontend/dist"))],
+                sources=[
+                    s3_deployment.Source.asset(
+                        os.path.join(project_root, "frontend/dist")
+                    )
+                ],
                 destination_bucket=self.bucket,
                 distribution=self.distribution,
                 distribution_paths=["/*"],
             )
         except Exception:
-            print("Frontend build not found. Run 'cd frontend && npm install && npm run build' to build the frontend.")
-        
+            print(
+                "Frontend build not found. Run 'cd frontend && npm install && npm run build' to build the frontend."
+            )
+
         # Config injector Lambda
         config_injector_log_group = logs.LogGroup(
             self,
@@ -111,14 +115,16 @@ class FrontendConstruct(Construct):
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
-        
+
         config_injector = lambda_.Function(
             self,
             "ConfigInjectorLambda",
             function_name="frontend-config-injector",
             runtime=lambda_.Runtime.PYTHON_3_10,
             handler="handler.lambda_handler",
-            code=lambda_.Code.from_asset(os.path.join(cdk_app_dir, "lambda_functions/config_injector")),
+            code=lambda_.Code.from_asset(
+                os.path.join(cdk_app_dir, "lambda_functions/config_injector")
+            ),
             timeout=Duration.seconds(60),
             log_group=config_injector_log_group,
             memory_size=256,
@@ -129,7 +135,7 @@ class FrontendConstruct(Construct):
                 "DISTRIBUTION_ID": self.distribution.distribution_id,
             },
         )
-        
+
         # Grant permissions
         config_injector.add_to_role_policy(
             iam.PolicyStatement(
@@ -141,16 +147,18 @@ class FrontendConstruct(Construct):
         config_injector.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["cloudfront:CreateInvalidation"],
-                resources=[f"arn:aws:cloudfront::{account_id}:distribution/{self.distribution.distribution_id}"],
+                resources=[
+                    f"arn:aws:cloudfront::{account_id}:distribution/{self.distribution.distribution_id}"
+                ],
             )
         )
-        
+
         # Custom Resource for config injection
         config_injection = CustomResource(
             self,
             "ConfigInjection",
             service_token=config_injector.function_arn,
-            properties={"Timestamp": str(time.time())}
+            properties={"Timestamp": str(time.time())},
         )
         config_injection.node.add_dependency(api)
         config_injection.node.add_dependency(api_key)

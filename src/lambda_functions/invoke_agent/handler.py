@@ -3,7 +3,9 @@ import os
 import boto3
 import traceback
 
-bedrock_runtime = boto3.client('bedrock-agentcore', region_name=os.environ['AWS_REGION'])
+bedrock_runtime = boto3.client(
+    "bedrock-agentcore", region_name=os.environ["AWS_REGION"]
+)
 
 # Lazy initialization for DynamoDB (only needed if AGGREGATION_TABLE_NAME is set)
 _dynamodb = None
@@ -14,9 +16,9 @@ def get_aggregation_table():
     """Get DynamoDB aggregation table with lazy initialization."""
     global _dynamodb, _aggregation_table
     if _aggregation_table is None:
-        table_name = os.environ.get('AGGREGATION_TABLE_NAME')
+        table_name = os.environ.get("AGGREGATION_TABLE_NAME")
         if table_name:
-            _dynamodb = boto3.resource('dynamodb')
+            _dynamodb = boto3.resource("dynamodb")
             _aggregation_table = _dynamodb.Table(table_name)
     return _aggregation_table
 
@@ -24,7 +26,7 @@ def get_aggregation_table():
 def check_token_limit(tenant_id: str) -> tuple:
     """
     Check if tenant has exceeded their token limit.
-    
+
     Returns:
         tuple: (allowed: bool, usage_info: dict)
         - allowed: True if request can proceed, False if limit exceeded
@@ -34,36 +36,36 @@ def check_token_limit(tenant_id: str) -> tuple:
     if table is None:
         # No aggregation table configured, allow request
         return True, {}
-    
+
     try:
         aggregation_key = f"tenant:{tenant_id}"
-        response = table.get_item(Key={'aggregation_key': aggregation_key})
-        
-        item = response.get('Item')
+        response = table.get_item(Key={"aggregation_key": aggregation_key})
+
+        item = response.get("Item")
         if not item:
             # No usage record for tenant, allow request
             return True, {}
-        
-        token_limit = item.get('token_limit')
+
+        token_limit = item.get("token_limit")
         if token_limit is None:
             # No limit set for tenant, allow request
-            return True, {'total_tokens': int(item.get('total_tokens', 0))}
-        
-        total_tokens = int(item.get('total_tokens', 0))
+            return True, {"total_tokens": int(item.get("total_tokens", 0))}
+
+        total_tokens = int(item.get("total_tokens", 0))
         token_limit = int(token_limit)
-        
+
         usage_info = {
-            'tenant_id': tenant_id,
-            'total_tokens': total_tokens,
-            'token_limit': token_limit
+            "tenant_id": tenant_id,
+            "total_tokens": total_tokens,
+            "token_limit": token_limit,
         }
-        
+
         if total_tokens >= token_limit:
             # Limit exceeded
             return False, usage_info
-        
+
         return True, usage_info
-        
+
     except Exception as e:
         print(f"Error checking token limit for tenant {tenant_id}: {str(e)}")
         # On error, allow request to proceed (fail open)
@@ -79,13 +81,15 @@ def extract_tenant_from_agent_arn(agent_arn: str) -> str:
     # This is a placeholder - in production, you'd look up the tenant from agent details
     return None
 
+
 # CORS headers for all responses
 CORS_HEADERS = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
 }
+
 
 def extract_text_from_response(obj):
     """
@@ -94,115 +98,118 @@ def extract_text_from_response(obj):
     """
     if isinstance(obj, str):
         return obj
-    
+
     if isinstance(obj, dict):
         # Check for result key
-        if 'result' in obj:
-            return extract_text_from_response(obj['result'])
-        
+        if "result" in obj:
+            return extract_text_from_response(obj["result"])
+
         # Check for role and content (Anthropic format)
-        if 'role' in obj and 'content' in obj:
-            return extract_text_from_response(obj['content'])
-        
+        if "role" in obj and "content" in obj:
+            return extract_text_from_response(obj["content"])
+
         # Check for content array
-        if 'content' in obj and isinstance(obj['content'], list):
+        if "content" in obj and isinstance(obj["content"], list):
             texts = []
-            for item in obj['content']:
-                if isinstance(item, dict) and 'text' in item:
-                    texts.append(item['text'])
+            for item in obj["content"]:
+                if isinstance(item, dict) and "text" in item:
+                    texts.append(item["text"])
                 elif isinstance(item, str):
                     texts.append(item)
-            return '\n\n'.join(texts) if texts else str(obj)
-        
+            return "\n\n".join(texts) if texts else str(obj)
+
         # Check for direct text field
-        if 'text' in obj:
-            return obj['text']
-        
+        if "text" in obj:
+            return obj["text"]
+
         # Check for message or completion
-        if 'message' in obj:
-            return extract_text_from_response(obj['message'])
-        if 'completion' in obj:
-            return extract_text_from_response(obj['completion'])
-    
+        if "message" in obj:
+            return extract_text_from_response(obj["message"])
+        if "completion" in obj:
+            return extract_text_from_response(obj["completion"])
+
     if isinstance(obj, list):
         texts = []
         for item in obj:
-            if isinstance(item, dict) and 'text' in item:
-                texts.append(item['text'])
+            if isinstance(item, dict) and "text" in item:
+                texts.append(item["text"])
             elif isinstance(item, str):
                 texts.append(item)
             else:
                 texts.append(extract_text_from_response(item))
-        return '\n\n'.join(texts) if texts else str(obj)
-    
+        return "\n\n".join(texts) if texts else str(obj)
+
     return str(obj)
+
 
 def lambda_handler(event, context):
     print(f"Received event: {json.dumps(event)}")
-    
+
     try:
-        body = json.loads(event.get('body', '{}'))
-        agent_id = body.get('agentId')
-        input_text = body.get('inputText')
-        session_id = body.get('sessionId', 'default-session')
-        tenant_id = body.get('tenantId')  # Optional: can be passed explicitly
-        
+        body = json.loads(event.get("body", "{}"))
+        agent_id = body.get("agentId")
+        input_text = body.get("inputText")
+        session_id = body.get("sessionId", "default-session")
+        tenant_id = body.get("tenantId")  # Optional: can be passed explicitly
+
         print(f"Agent ID: {agent_id}")
         print(f"Input text: {input_text}")
         print(f"Tenant ID: {tenant_id}")
-        
+
         if not agent_id or not input_text:
             return {
-                'statusCode': 400,
-                'headers': CORS_HEADERS,
-                'body': json.dumps({'error': 'agentId and inputText are required'})
+                "statusCode": 400,
+                "headers": CORS_HEADERS,
+                "body": json.dumps({"error": "agentId and inputText are required"}),
             }
-        
+
         # Check token limit if tenant ID is provided
         if tenant_id:
             allowed, usage_info = check_token_limit(tenant_id)
             if not allowed:
                 print(f"Token limit exceeded for tenant {tenant_id}: {usage_info}")
                 return {
-                    'statusCode': 429,
-                    'headers': CORS_HEADERS,
-                    'body': json.dumps({
-                        'error': 'Token limit exceeded',
-                        'message': f"Tenant {tenant_id} has reached their token limit of {usage_info.get('token_limit', 0):,} tokens. Current usage: {usage_info.get('total_tokens', 0):,} tokens.",
-                        'tenant_id': tenant_id,
-                        'token_limit': usage_info.get('token_limit'),
-                        'current_usage': usage_info.get('total_tokens')
-                    })
+                    "statusCode": 429,
+                    "headers": CORS_HEADERS,
+                    "body": json.dumps(
+                        {
+                            "error": "Token limit exceeded",
+                            "message": f"Tenant {tenant_id} has reached their token limit of {usage_info.get('token_limit', 0):,} tokens. Current usage: {usage_info.get('total_tokens', 0):,} tokens.",
+                            "tenant_id": tenant_id,
+                            "token_limit": usage_info.get("token_limit"),
+                            "current_usage": usage_info.get("total_tokens"),
+                        }
+                    ),
                 }
-        
+
         # Invoke the agent
         print(f"Invoking agent: {agent_id}")
         response = bedrock_runtime.invoke_agent_runtime(
             agentRuntimeArn=agent_id,
-            payload=json.dumps({'message': input_text}).encode('utf-8'),
-            contentType='application/json'
+            payload=json.dumps({"message": input_text}).encode("utf-8"),
+            contentType="application/json",
         )
-        
+
         # Log the full response structure for debugging
         print(f"Full response keys: {list(response.keys())}")
         print(f"Response metadata: {response.get('ResponseMetadata', {})}")
-        
+
         # The actual response is in the 'response' key, not 'body'
-        response_data = response.get('response', '')
-        
+        response_data = response.get("response", "")
+
         # Handle different response types
-        if hasattr(response_data, 'read'):
+        if hasattr(response_data, "read"):
             # It's a StreamingBody
             response_data = response_data.read()
-        
+
         # Decode if bytes
         if isinstance(response_data, bytes):
-            response_data = response_data.decode('utf-8')
-        
+            response_data = response_data.decode("utf-8")
+
         print(f"Agent response data: {response_data}")
         print(f"Agent response data type: {type(response_data)}")
         print(f"Agent response data length: {len(str(response_data))}")
-        
+
         # Try to parse as JSON if it's a string
         try:
             if isinstance(response_data, str) and response_data.strip():
@@ -214,18 +221,15 @@ def lambda_handler(event, context):
         except json.JSONDecodeError:
             # If not JSON, use as-is
             response_body = response_data
-        
+
         # If response is empty, return a message indicating the agent processed the request
-        if not response_body or str(response_body).strip() == '':
+        if not response_body or str(response_body).strip() == "":
             response_body = "Agent processed the request successfully. Check token usage for confirmation."
-        
+
         return {
-            'statusCode': 200,
-            'headers': CORS_HEADERS,
-            'body': json.dumps({
-                'completion': response_body,
-                'sessionId': session_id
-            })
+            "statusCode": 200,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"completion": response_body, "sessionId": session_id}),
         }
     except Exception as e:
         error_msg = str(e)
@@ -233,10 +237,7 @@ def lambda_handler(event, context):
         print(f"Error invoking agent: {error_msg}")
         print(f"Traceback: {error_trace}")
         return {
-            'statusCode': 500,
-            'headers': CORS_HEADERS,
-            'body': json.dumps({
-                'error': error_msg,
-                'type': type(e).__name__
-            })
+            "statusCode": 500,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"error": error_msg, "type": type(e).__name__}),
         }
