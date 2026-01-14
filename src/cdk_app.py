@@ -44,6 +44,17 @@ class BedrockAgentStack(Stack):
         # Storage Layer
         # ============================================================
         
+        # S3 access logs bucket
+        access_logs_bucket = s3.Bucket(
+            self,
+            "AccessLogsBucket",
+            bucket_name=f"bedrock-agentcore-logs-{account_id}-{region}",
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+            enforce_ssl=True,
+            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+        )
+        
         # S3 bucket for agent code
         code_bucket = s3.Bucket(
             self,
@@ -51,6 +62,9 @@ class BedrockAgentStack(Stack):
             bucket_name=f"bedrock-agentcore-code-{account_id}-{region}",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
+            enforce_ssl=True,
+            server_access_logs_bucket=access_logs_bucket,
+            server_access_logs_prefix="code-bucket/",
         )
         
         # DynamoDB tables

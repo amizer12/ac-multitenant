@@ -24,6 +24,7 @@ class DatabaseConstruct(Construct):
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
             stream=dynamodb.StreamViewType.NEW_IMAGE,
+            point_in_time_recovery=True,
         )
         
         # Token aggregation table
@@ -36,6 +37,7 @@ class DatabaseConstruct(Construct):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
+            point_in_time_recovery=True,
         )
         
         # Agent configurations table (runtime config)
@@ -51,6 +53,7 @@ class DatabaseConstruct(Construct):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
+            point_in_time_recovery=True,
         )
         
         # Agent details table
@@ -66,4 +69,5 @@ class DatabaseConstruct(Construct):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,
+            point_in_time_recovery=True,
         )
