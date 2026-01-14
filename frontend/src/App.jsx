@@ -35,7 +35,7 @@ function App() {
   const [selectedAgentForInvoke, setSelectedAgentForInvoke] = useState(null);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [agentConfig, setAgentConfig] = useState({
-    modelId: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+    modelId: 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
     systemPrompt: 'You are a helpful AI assistant.',
     customSettings: {}
   });
@@ -1045,9 +1045,9 @@ function App() {
                     </Select.Trigger>
                     <Select.Popover>
                       <ListBox>
-                        <ListBox.Item id="us.anthropic.claude-opus-4-5-20251101-v1:0" textValue="Claude Opus 4.5">Claude Opus 4.5<ListBox.ItemIndicator /></ListBox.Item>
-                        <ListBox.Item id="us.anthropic.claude-sonnet-4-5-20250929-v1:0" textValue="Claude Sonnet 4.5">Claude Sonnet 4.5<ListBox.ItemIndicator /></ListBox.Item>
-                        <ListBox.Item id="us.anthropic.claude-haiku-4-5-20251001-v1:0" textValue="Claude Haiku 4.5">Claude Haiku 4.5<ListBox.ItemIndicator /></ListBox.Item>
+                        <ListBox.Item id="global.anthropic.claude-opus-4-5-20251101-v1:0" textValue="Claude Opus 4.5">Claude Opus 4.5<ListBox.ItemIndicator /></ListBox.Item>
+                        <ListBox.Item id="global.anthropic.claude-sonnet-4-5-20250929-v1:0" textValue="Claude Sonnet 4.5">Claude Sonnet 4.5<ListBox.ItemIndicator /></ListBox.Item>
+                        <ListBox.Item id="global.anthropic.claude-haiku-4-5-20251001-v1:0" textValue="Claude Haiku 4.5">Claude Haiku 4.5<ListBox.ItemIndicator /></ListBox.Item>
                       </ListBox>
                     </Select.Popover>
                   </Select>

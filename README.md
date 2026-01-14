@@ -80,7 +80,7 @@ Frontend → API Gateway → infrastructure_costs → Cost Explorer (tenantId ta
 
 ## Deployment
 
-### One-Command Deployment
+### Deployment (Default Region: us-east-1)
 
 ```bash
 chmod a+x deploy.sh
@@ -95,6 +95,55 @@ This script will:
 4. **Automatically generate config.js** with API endpoint and key
 5. Deploy frontend to S3 and CloudFront
 6. Invalidate CloudFront cache
+
+### Deploy to a Specific Region
+
+The deployment script respects the `AWS_DEFAULT_REGION` environment variable. To deploy to a different AWS region:
+
+```bash
+# Deploy to eu-central-1 (Frankfurt)
+AWS_DEFAULT_REGION=eu-central-1 ./deploy.sh
+
+# Deploy to us-west-2 (Oregon)
+AWS_DEFAULT_REGION=us-west-2 ./deploy.sh
+
+# Deploy to ap-southeast-1 (Singapore)
+AWS_DEFAULT_REGION=ap-southeast-1 ./deploy.sh
+```
+
+**Region Configuration:**
+- Default region: `us-east-1` (if not specified)
+- The script reads from `AWS_DEFAULT_REGION` environment variable
+- The region is displayed during deployment: "Deploying to region: [region]"
+- The script internally sets `CDK_DEFAULT_REGION` for CDK commands
+
+**Important Notes:**
+- The region must support AWS Bedrock Agent Core
+- You must bootstrap CDK in the target region first (see below)
+- Each region deployment creates a separate, independent stack
+- Resource names include the region to avoid conflicts
+
+### Bootstrap a New Region
+
+Before deploying to a new region for the first time:
+
+```bash
+# Bootstrap the target region (replace with your account ID)
+AWS_DEFAULT_REGION=eu-central-1 cdk bootstrap aws://YOUR_ACCOUNT_ID/eu-central-1
+
+# Or let CDK auto-detect your account
+AWS_DEFAULT_REGION=eu-central-1 cdk bootstrap
+```
+
+### Manual CDK Deployment (Without Frontend Build)
+
+```bash
+# Deploy to default region (us-east-1)
+cd src && cdk deploy --app "python3 cdk_app.py"
+
+# Deploy to specific region
+cd src && AWS_DEFAULT_REGION=eu-central-1 cdk deploy --app "python3 cdk_app.py"
+```
 
 ### What Gets Deployed
 
@@ -186,8 +235,18 @@ The platform provides comprehensive cost tracking with two components:
 To delete all resources:
 
 ```bash
+# Delete from default region (us-east-1)
 cdk destroy --app "python3 src/cdk_app.py"
+
+# Delete from specific region
+AWS_DEFAULT_REGION=eu-central-1 cdk destroy --app "python3 src/cdk_app.py"
 ```
+
+**Note:** All resources are configured with automatic deletion policies:
+- S3 buckets are automatically emptied before deletion
+- CloudWatch log groups are automatically removed
+- DynamoDB tables are deleted with their data
+- No manual cleanup required
 
 ## Creating Custom Agent Tools (Optional)
 

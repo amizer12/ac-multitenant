@@ -445,7 +445,7 @@ def build_agent_project(
     if config is None:
         config = {}
 
-    model_id = config.get("modelId", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+    model_id = config.get("modelId", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
     system_prompt = config.get("systemPrompt", "You are a helpful AI assistant.")
 
     project_dir = "/tmp/agentcore_runtime_direct_deploy"  # nosec B108 - Lambda ephemeral storage
