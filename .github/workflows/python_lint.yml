@@ -1,7 +1,7 @@
 name: Python Code Quality
 
-on:
-  pull_request:
+on: 
+  push:
     branches: [ main ]
 
 permissions:
