@@ -39,9 +39,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Agent tools
-agent-tools-repo/
-
 # ASH Security Scan (run externally, not in repo)
 ash-security-scan/
 
