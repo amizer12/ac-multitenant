@@ -1,8 +1,6 @@
-name: ASH Security Scan
+name: ASH Security Scan with PR Comments
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -19,8 +17,23 @@ jobs:
         run: pip install git+https://github.com/awslabs/automated-security-helper.git@v3.1.5
       - name: Run ASH scan
         run: ash --mode local
-      - name: Upload scan results
-        uses: actions/upload-artifact@v4
+      - name: Add PR comment
+        uses: actions/github-script@v6
+        if: always()
         with:
-          name: ash-results
-          path: .ash/ash_output
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reportPath = '.ash/ash_output/reports/ash.summary.md';
+
+            if (fs.existsSync(reportPath)) {
+              const reportContent = fs.readFileSync(reportPath, 'utf8');
+              const issueNumber = context.issue.number;
+
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: reportContent
+              });
+            }
