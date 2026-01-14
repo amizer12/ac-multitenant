@@ -23,16 +23,15 @@ import time
 from datetime import datetime
 
 # Get configuration from environment variables or use defaults
+REGION = region=os.environ['AWS_REGION']
 AGENT_NAME = os.environ.get('AGENT_NAME', 'sqs')
-BUCKET_NAME = os.environ.get('BUCKET_NAME', '')
+BUCKET_NAME = os.environ.get('BUCKET_NAME', f'bedrock-agentcore-code-803141810841-{REGION}')
 QUEUE_URL = os.environ.get('QUEUE_URL', '')
 ROLE_ARN = os.environ.get('ROLE_ARN', '')
-REGION = os.environ.get('AWS_REGION', 'us-west-2')
 
-# AWS Lambda automatically sets AWS_REGION, so we don't need to specify it
-s3_client = boto3.client('s3')
-bedrock_client = boto3.client('bedrock-agentcore-control')
-bedrock_runtime_client = boto3.client('bedrock-agentcore')
+s3_client = boto3.client('s3', region_name=REGION)
+bedrock_client = boto3.client('bedrock-agentcore-control', region_name=REGION)
+bedrock_runtime_client = boto3.client('bedrock-agentcore', region_name=REGION)
 ce_client = boto3.client('ce')
 
 def check_and_activate_cost_allocation_tags():
@@ -299,6 +298,8 @@ import uuid
 import json
 import os
 
+region=os.environ['AWS_REGION']
+
 app = BedrockAgentCoreApp(debug=True)
 
 # Deployment-time configuration (injected during build)
@@ -308,38 +309,20 @@ AGENT_RUNTIME_ID = 'AGENT_RUNTIME_ID_VALUE'
 MODEL_ID = 'MODEL_ID_VALUE'
 SYSTEM_PROMPT = '''SYSTEM_PROMPT_VALUE'''
 
-# Lazy initialization to speed up cold starts
-_sqs = None
-_dynamodb = None
-_config_table = None
-_agent = None
+# Initialize clients
+sqs = boto3.client('sqs', region_name=region)
+dynamodb = boto3.resource('dynamodb', region_name=region)
+config_table = dynamodb.Table('agent-configurations')
 
-def get_sqs():
-    global _sqs
-    if _sqs is None:
-        _sqs = boto3.client('sqs')
-    return _sqs
-
-def get_config_table():
-    global _dynamodb, _config_table
-    if _config_table is None:
-        _dynamodb = boto3.resource('dynamodb')
-        _config_table = _dynamodb.Table(os.environ.get('AGENT_CONFIG_TABLE_NAME', 'agent-configurations'))
-    return _config_table
-
-def get_agent():
-    global _agent
-    if _agent is None:
-        _agent = Agent(
-            model=MODEL_ID,
-            system_prompt=SYSTEM_PROMPT
-        )
-    return _agent
+# Initialize agent with deployment-time config
+agent = Agent(
+    model=MODEL_ID,
+    system_prompt=SYSTEM_PROMPT
+)
 
 def get_runtime_config():
     \"\"\"Fetch runtime configuration from DynamoDB\"\"\"
     try:
-        config_table = get_config_table()
         response = config_table.get_item(
             Key={
                 'tenantId': TENANT_ID,
@@ -359,7 +342,6 @@ def get_runtime_config():
 
 def send_usage_to_sqs(input_tokens, output_tokens, total_tokens, user_message, response_message, tenant_id):
     try:
-        sqs = get_sqs()
         message_body = {
             'id': str(uuid.uuid4()),
             'timestamp': datetime.utcnow().isoformat(),
@@ -399,8 +381,6 @@ def invoke(payload):
         if runtime_config.get('enabled', True) == False:
             return {"result": "Agent is currently disabled for maintenance"}
     
-    # Get agent instance (lazy initialization)
-    agent = get_agent()
     result = agent(user_message)
 
     if hasattr(result, 'metrics'):
@@ -784,8 +764,8 @@ def lambda_handler(event, context):
         # Store agent details in DynamoDB for later retrieval
         try:
             dynamodb = boto3.resource('dynamodb')
-            agent_table = dynamodb.Table(os.environ.get('AGENT_DETAILS_TABLE_NAME', 'agent-details-v2'))
-            config_table = dynamodb.Table(os.environ.get('AGENT_CONFIG_TABLE_NAME', 'agent-configurations'))
+            agent_table = dynamodb.Table('agent-details-v2')
+            config_table = dynamodb.Table('agent-configurations')
             
             # Convert config to DynamoDB-compatible format (Float -> Decimal)
             from decimal import Decimal

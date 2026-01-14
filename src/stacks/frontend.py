@@ -39,7 +39,7 @@ class FrontendConstruct(Construct):
         self.bucket = s3.Bucket(
             self,
             "FrontendBucket",
-            bucket_name=f"bedrock-agent-dashboard-{account_id}",
+            bucket_name=f"bedrock-agent-dashboard-{account_id}-{region}",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
         )
