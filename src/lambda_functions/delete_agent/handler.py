@@ -116,7 +116,7 @@ def lambda_handler(event, context):
             print("Successfully deleted agent details from DynamoDB")
         except Exception as db_error:
             error_msg = str(db_error)
-            print(
+            print(  # nosec B608
                 f"Warning: Agent deleted from Bedrock but failed to delete from DynamoDB: {error_msg}"
             )
             # Agent is deleted from Bedrock but not from DB - return partial success

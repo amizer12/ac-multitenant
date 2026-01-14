@@ -42,7 +42,7 @@ class ApiConstruct(Construct):
         # Create API Key
         self.api_key = self.api.add_api_key(
             "AgentDeploymentApiKey",
-            api_key_name="agent-deployment-key",
+            api_key_name="agent-deployment-key",  # pragma: allowlist secret
         )
 
         # Create Usage Plan

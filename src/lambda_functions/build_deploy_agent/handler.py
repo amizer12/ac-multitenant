@@ -521,7 +521,7 @@ def build_agent_project(
     # Initialize UV project
     print("Initializing UV project...")
     subprocess.run(
-        ["uv", "init", project_dir, "--python", "3.13"], check=True, cwd="/tmp"
+        ["uv", "init", project_dir, "--python", "3.13"], check=True, cwd="/tmp"  # nosec B108
     )
 
     # Add dependencies (base + additional from tools)

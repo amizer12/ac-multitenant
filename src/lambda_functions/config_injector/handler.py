@@ -118,7 +118,8 @@ def send_response(event, context, response_status, response_data):
     )
 
     try:
-        response = urlopen(req)
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        response = urlopen(req)  # nosec B310 - URL from CloudFormation, not user input
         print(f"CloudFormation response status: {response.status}")
     except Exception as e:
         print(f"Failed to send response to CloudFormation: {str(e)}")
